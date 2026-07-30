@@ -7,11 +7,11 @@ purpose: Decisions that are blocking or will become blocking.
 
 ## Blocking content production
 
-**1. Gear roster.** 11 candidates per slot need selecting from `03-content/gear-candidates.md`. Blocks all art.
+**1. Gear roster.** 11 candidates per slot need selecting from `03-cosmetics/content/gear-candidates.md`. Blocks all art.
 
-**2. Skin roster, and which cosmic Legendary.** See `03-content/skin-candidates.md`. Blocks the shader work.
+**2. Skin roster, and which cosmic Legendary.** See `03-cosmetics/content/skin-candidates.md`. Blocks the shader work.
 
-**3. Permanent pool vs seasonal sets.** Are launch skin families uniform-tier, with seasonal sets as a separate mixed-tier construct? See `03-content/set-list.md`. Blocks the Set Crate implementation.
+**3. Permanent pool vs seasonal sets.** Are launch skin families uniform-tier, with seasonal sets as a separate mixed-tier construct? See `03-cosmetics/content/set-list.md`. Blocks the Set Crate implementation.
 
 ## Blocking economy tuning
 

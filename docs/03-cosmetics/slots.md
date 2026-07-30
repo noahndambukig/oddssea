@@ -14,7 +14,7 @@ purpose: The six equipment slots, their layer order, and clipping suppression.
 | 5 | **Backpack** | Rear mass | Splits across two layers (rear + straps). |
 | 6 | **Held item** | Expressive | Replaces the "weapon" slot from early drafts. Comedy lives here, and comedy drives sharing. |
 
-Candidate items for each slot are in `03-content/gear-candidates.md`.
+Candidate items for each slot are in `03-cosmetics/content/gear-candidates.md`.
 
 ## Slot attention is not equal — plan for it
 

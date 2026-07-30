@@ -45,15 +45,15 @@ When something is decided — especially when something is *reversed* — write 
 
 Markdown tables are the right format for *deciding* what the catalogue contains. They are the wrong format for *shipping* it.
 
-Once the gear and skin rosters are locked, move them to `03-content/data/*.json` and have both the game and the docs read from that file. A markdown table and a game database will drift apart; a generated table cannot. Until the roster is locked, markdown is fine — do not build the pipeline before the content exists.
+Once the gear and skin rosters are locked, move them to `03-cosmetics/content/data/*.json` and have both the game and the docs read from that file. A markdown table and a game database will drift apart; a generated table cannot. Until the roster is locked, markdown is fine — do not build the pipeline before the content exists.
 
 ## Where things go when you're unsure
 
 | You're writing about... | It goes in |
 |---|---|
-| How a mechanic behaves | `01-systems/` |
+| How a mechanic behaves | `03-cosmetics/` |
 | What something costs | `02-economy/` |
-| A specific item or set | `03-content/` |
+| A specific item or set | `03-cosmetics/content/` |
 | How art gets made | `04-production/` |
-| When something ships | `05-roadmap/` |
+| When something ships | `00-project/roadmap.md` |
 | Why we chose X over Y | `decisions/` |

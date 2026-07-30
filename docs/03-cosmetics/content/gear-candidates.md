@@ -1,7 +1,7 @@
 ---
 status: awaiting selection
 purpose: Candidate gear items per slot, for Noah to pick the launch roster from.
-depends-on: 01-systems/slots.md, 01-systems/rarity-tiers.md
+depends-on: 03-cosmetics/slots.md, 03-cosmetics/rarity-tiers.md
 ---
 
 # Gear Candidates

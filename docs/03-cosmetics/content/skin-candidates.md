@@ -1,7 +1,7 @@
 ---
 status: awaiting selection
 purpose: Candidate skin families, for Noah to pick the launch roster from.
-depends-on: 01-systems/animation-ladder.md, 01-systems/rarity-tiers.md
+depends-on: 03-cosmetics/animation-ladder.md, 03-cosmetics/rarity-tiers.md
 ---
 
 # Skin Candidates

@@ -17,7 +17,7 @@ This structure does three useful things at once:
 
 Each set mixes tiers deliberately: **five Common-to-Epic pieces plus one Legendary keystone.** The set is achievable, but the keystone is the wall — and the wall is where the top-end sink lives.
 
-Candidate sets are listed in `03-content/set-list.md`.
+Candidate sets are listed in `03-cosmetics/content/set-list.md`.
 
 ## Set bonuses
 

@@ -5,7 +5,7 @@ purpose: Single source of truth for every coin figure in the system.
 
 # Currency Model
 
-**Every coin number in the project lives in this file.** Other documents link here rather than restating figures. See `00-overview/doc-conventions.md`, rule 2.
+**Every coin number in the project lives in this file.** Other documents link here rather than restating figures. See `00-project/doc-conventions.md`, rule 2.
 
 ## Faucets — coins in
 
