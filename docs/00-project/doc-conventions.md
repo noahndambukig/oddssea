@@ -54,6 +54,7 @@ Once the gear and skin rosters are locked, move them to `03-cosmetics/content/da
 | How a mechanic behaves | `03-cosmetics/` |
 | What something costs | `02-economy/` |
 | A specific item or set | `03-cosmetics/content/` |
-| How art gets made | `04-production/` |
+| How art gets made | `05-production/` |
+| Platform, stack or hosting | `04-technical/` |
 | When something ships | `00-project/roadmap.md` |
 | Why we chose X over Y | `decisions/` |

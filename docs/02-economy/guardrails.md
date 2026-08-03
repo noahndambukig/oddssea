@@ -1,9 +1,16 @@
 ---
-status: agreed
+status: draft — needs revision for the wager economy
 purpose: The rules and metrics that stop the economy inflating.
+depends-on: ../decisions/0005-wagering-earns-the-cosmetic-currency.md
 ---
 
 # Anti-Inflation Guardrails
+
+> **Needs revision for `decisions/0005`.** The principles survive, but rule 1
+> and the metrics reference dust and the coin economy. Their revamp
+> equivalents: house edge is the Shell sink, so the destruction ratio becomes
+> edge × handle ÷ task faucet; the collection-rewards rule becomes "set
+> completion pays one-time, never per-day."
 
 ## Non-negotiable rules
 

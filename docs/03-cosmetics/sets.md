@@ -25,11 +25,11 @@ Partial bonuses matter. A player at 3/6 with no reward is a player who abandons 
 
 | Progress | Reward |
 |---|---|
-| **3 / 6** | Nameplate tint in the set's palette · small daily dust claim |
-| **5 / 6** | Unique idle pose · medium daily dust claim |
-| **6 / 6** | Full-body aura FX · a title · a mannequin pedestal in the Closet · large daily dust claim |
+| **3 / 6** | Nameplate tint in the set's palette |
+| **5 / 6** | Unique idle pose |
+| **6 / 6** | Full-body aura FX · a title · a mannequin pedestal in the Closet · a one-time Shell bonus |
 
-**Every set bonus is paid in dust, never coins** — see `decisions/0004`. Stipend amounts and the global cap are in `02-economy/dust.md`.
+**The completion bonus is one-time, paid in Shells — never a recurring stipend** — see `decisions/0005`. The bonus amount lives in `02-economy/currency-model.md`. Ongoing veteran rewards are deferred, not rejected.
 
 ## Test the full-set look early
 

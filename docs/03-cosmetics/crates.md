@@ -39,7 +39,7 @@ Skins are priced above gear and drop Legendaries slightly less often, because th
 
 Only ever contains pieces from the currently active set, so it is a targeted purchase rather than a lottery.
 
-**The first four pulls from a given set are guaranteed to be distinct pieces.** Without this, duplicate luck dominates: plain random pulls need ~14.7 crates to complete a six-piece set and the tail is brutal. The distinct guarantee plus dust salvage brings it to ~10.4, which is what makes the timings in `02-economy/currency-model.md` work. Getting the same piece three times in your first three pulls is the fastest way to make a player abandon a set.
+**The first four pulls from a given set are guaranteed to be distinct pieces.** Without this, duplicate luck dominates: plain random pulls need ~14.7 crates to complete a six-piece set and the tail is brutal. The distinct guarantee plus duplicate salvage brings it to ~10.4, which is what makes the timings in `02-economy/currency-model.md` work. Getting the same piece three times in your first three pulls is the fastest way to make a player abandon a set.
 
 ## Pity timers
 

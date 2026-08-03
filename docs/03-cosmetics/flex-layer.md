@@ -19,9 +19,9 @@ Avatars have a structural problem: **only six items are visible at once.** A pla
 
 ## Later
 
-**Visitor tipping.** Let admirers tip dust on a closet or outfit. Converts social approval into progress and keeps currency circulating rather than hoarded.
+**Visitor tipping.** Let admirers tip a small currency amount on a closet or outfit. Converts social approval into progress and keeps currency circulating rather than hoarded. **Which currency tips pay is open since dust was removed** — see `00-project/roadmap.md`, question 9.
 
-**Fusion.** Consume four items of one tier plus coins for one item of the next tier up. Genuinely deflationary — it destroys items *and* currency — while delivering the gambling thrill.
+**Fusion.** Consume four items of one tier plus currency for one item of the next tier up. Genuinely deflationary — it destroys items *and* currency — while delivering the gambling thrill. Denominations land in the `02-economy/currency-model.md` rewrite.
 
 **Wear / condition.** A cheap third axis: patina, sun-fading, creasing. One overlay shader, large perceived depth, and an entire secondary market. CS:GO's float value is essentially this.
 

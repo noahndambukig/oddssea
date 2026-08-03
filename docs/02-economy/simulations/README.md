@@ -17,7 +17,7 @@ Any figure in `../currency-model.md` that came from a simulation is reproducible
 | Figure | Value | Source |
 |---|---|---|
 | Crates to complete a set (random) | 14.7 | set-completion.py |
-| Crates to complete a set (4 distinct + dust) | 10.4 | set-completion.py |
+| Crates to complete a set (4 distinct + salvage) | 10.4 | set-completion.py |
 | Effective Legendary rate, Gear Crate | 4.60% | crate-rates.py |
 | Effective Legendary rate, Skin Crate | 3.84% | crate-rates.py |
 | Effective Epic+ rate, Gear Crate | 18.7% | crate-rates.py |

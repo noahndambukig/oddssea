@@ -9,4 +9,4 @@ status: accepted
 
 **Why:** Content scales multiplicatively while art cost scales additively. With 11 gear and 11 skins in a slot you get 121 distinct looks from 22 authored things. A single-axis system would need 121 authored items for the same variety.
 
-**Consequence:** Skins must be authored against a mask channel rather than painted onto specific garments. See `04-production/art-pipeline.md`.
+**Consequence:** Skins must be authored against a mask channel rather than painted onto specific garments. See `05-production/art-pipeline.md`.

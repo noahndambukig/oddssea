@@ -14,8 +14,9 @@ purpose: Shared vocabulary, so the same thing has one name everywhere.
 | **Look** | One gear + skin pairing in one slot. |
 | **Loadout** | Six looks equipped together. |
 | **Set** | A skin family a player is collecting toward; completing all six grants set bonuses. |
-| **Coins** | The main earned currency. Buys crates. |
-| **Dust** | A closed-loop secondary currency from salvage, set bonuses and tips. Buys targeted items. Can never become coins. |
+| **Shells** | The bankroll currency. Earned through tasks; the only currency that can be wagered. A winning bet returns odds × stake. |
+| **Pearls** | The cosmetic currency. Earned exclusively through wagering — more for wins than losses. Buys crates and targeted items; the marketplace trades in Pearls. |
+| **Handle** | Total Shells wagered over a period, win or lose. Pearl income scales with it. |
 | **Crate** | A randomised purchase. Gear, Skin and Set crates are separate. |
 | **Pity** | A guarantee that N opens without a given tier forces that tier on the next open. |
 | **Keystone** | The single Legendary piece in a set — the intended wall. |

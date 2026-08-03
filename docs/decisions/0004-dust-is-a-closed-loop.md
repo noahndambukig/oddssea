@@ -1,9 +1,15 @@
 ---
 date: 2026-07-29
-status: accepted
+status: superseded
+superseded-by: 0005-wagering-earns-the-cosmetic-currency.md
 ---
 
 # 0004 — Collection rewards are paid in dust, never coins
+
+> **Superseded by `0005-wagering-earns-the-cosmetic-currency.md`** — dust is
+> removed in the wager-economy revamp. The rationale below still holds and
+> shaped its replacement: 0005's one-time completion bonus exists to avoid
+> the same compounding failure this entry guarded against.
 
 **Decision:** Set bonuses, tips and salvage pay dust. Dust buys cosmetics and can never be converted to coins.
 

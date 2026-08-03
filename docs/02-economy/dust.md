@@ -1,9 +1,16 @@
 ---
-status: agreed
+status: superseded
 purpose: The closed secondary currency — salvage, targeted purchase, stipends.
+superseded-by: ../decisions/0005-wagering-earns-the-cosmetic-currency.md
 ---
 
 # Dust
+
+> **Superseded — dust is removed** (`decisions/0005`). Duplicate salvage now
+> pays Pearls at a lossy ratio, set completion pays a one-time Shell bonus,
+> and what visitor tips pay is open — see `00-project/roadmap.md`. Retained
+> until the Pearl salvage ratios land in the rewritten
+> `currency-model.md`; do not build against these numbers.
 
 Dust is a **cosmetic-only currency that can never be converted to coins.** This is the most important piece of economic engineering in the design: it lets us reward players generously for collection depth without ever adding pressure to the main economy. See `decisions/0004`.
 

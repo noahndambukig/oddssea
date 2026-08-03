@@ -25,4 +25,4 @@ Cosmetic systems die when each new item costs an artist a day. Content velocity 
 
 ## 5. Never inflate
 
-Any mechanic that returns currency must consume more than it produces. This pillar is why every collection reward is paid in dust rather than coins.
+Any mechanic that returns currency must consume more than it produces. This pillar is why set completion pays a one-time bonus rather than a perpetual stipend, and why the house edge must absorb the task faucet.

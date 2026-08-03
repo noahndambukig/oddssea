@@ -1,11 +1,19 @@
 ---
-status: agreed — simulated, not playtested
-purpose: Single source of truth for every coin figure in the system.
+status: draft — pre-revamp figures, rewrite pending
+purpose: Single source of truth for every currency figure in the system.
+depends-on: ../decisions/0005-wagering-earns-the-cosmetic-currency.md
 ---
 
 # Currency Model
 
-**Every coin number in the project lives in this file.** Other documents link here rather than restating figures. See `00-project/doc-conventions.md`, rule 2.
+> **The two-currency wager revamp (`decisions/0005`) replaces this model.**
+> The currencies are now Shells (task-earned, wagerable) and Pearls
+> (wager-earned, buys cosmetics). The figures below describe the pre-revamp
+> coin economy and are retained only until the Shell/Pearl numbers are
+> derived — that requires the bankroll-ruin simulation first. Do not build
+> against anything below this line.
+
+**Every currency number in the project lives in this file.** Other documents link here rather than restating figures. See `00-project/doc-conventions.md`, rule 2.
 
 ## Faucets — coins in
 

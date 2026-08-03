@@ -1,7 +1,8 @@
 # oddssea
 
-A social-casino / gambling-simulator game with an earned in-game currency and an
-avatar cosmetic collection system as its primary currency sink.
+A social-casino / gambling-simulator game. Players earn a wagerable currency
+(Shells) through tasks, wagering earns the cosmetic currency (Pearls), and an
+avatar cosmetic collection system is the primary sink.
 
 **Specs live in `docs/`. History lives in `journal/`. Code lives in `src/`.**
 Specs lead; code follows.
@@ -108,8 +109,10 @@ requires a decision entry.
 |---|---|
 | Cosmetic system | Agreed, simulated, not playtested |
 | Gear + skin rosters | Awaiting selection — `docs/03-cosmetics/content/` |
+| Economy | Revamped around wagering (`docs/decisions/0005`) — **numbers pending new simulations** |
 | Core game loop | **Not yet specced** |
-| Technical architecture | **Not yet specced** |
+| Platform + hosting | Agreed — web-first PWA on AWS, `docs/04-technical/` |
+| Data model | **Not yet specced** |
 | Compliance | Draft, written before the genre was settled — **needs revisiting** |
 
 ## Context worth knowing
