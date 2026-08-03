@@ -110,6 +110,7 @@ requires a decision entry.
 | Cosmetic system | Agreed, simulated, not playtested |
 | Gear + skin rosters | Awaiting selection — `docs/03-cosmetics/content/` |
 | Economy | Revamped around wagering (`docs/decisions/0005`) — **numbers pending new simulations** |
+| Launch game roster | Chosen — 7 games, `docs/decisions/0007` — **specs not yet written** |
 | Core game loop | **Not yet specced** |
 | Platform + hosting | Agreed — web-first PWA on AWS, `docs/04-technical/` |
 | Data model | **Not yet specced** |

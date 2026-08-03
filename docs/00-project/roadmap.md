@@ -23,12 +23,10 @@ purpose: Decisions that are blocking or will become blocking.
 
 ## Blocking design of the flex layer
 
-**7. Do avatars appear during matches, or only in menus, lobbies and profiles?** This determines how much weight the Closet and showcase have to carry. If avatars are visible in-match, the flex layer can be lighter; if they're menu-only, it has to do all the work.
+**7. Can Mythics be traded?** Untradeable is cleaner; tradeable is dramatic.
 
-**8. Can Mythics be traded?** Untradeable is cleaner; tradeable is dramatic.
-
-**9. What do visitor tips pay now that dust is removed?** Tipping Shells feeds bankrolls from social approval; tipping Pearls breaks their wager-exclusivity; removing tips weakens the Closet loop. See `03-cosmetics/flex-layer.md`.
+**8. What do visitor tips pay now that dust is removed?** Tipping Shells feeds bankrolls from social approval; tipping Pearls breaks their wager-exclusivity; removing tips weakens the Closet loop. See `03-cosmetics/flex-layer.md`.
 
 ## Blocking code
 
-**10. React or Svelte?** The UI framework for the web-native stack — see `04-technical/platform.md`. Blocks nothing until code starts; must be settled by then.
+**9. React or Svelte?** The UI framework for the web-native stack — see `04-technical/platform.md`. Blocks nothing until code starts; must be settled by then.
