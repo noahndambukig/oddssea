@@ -1,10 +1,16 @@
 ---
-status: awaiting selection
+status: superseded — now the backlog
 purpose: Candidate gear items per slot, for Noah to pick the launch roster from.
 depends-on: 03-cosmetics/slots.md, 03-cosmetics/rarity-tiers.md
 ---
 
 # Gear Candidates
+
+> **Selection happened at the family level instead**
+> (`decisions/0013-gear-families.md`): the launch roster is 11 thematic
+> families, one garment per slot each — see `gear-roster.md`. This file
+> stays as the item-idea backlog for catalogue expansion
+> (`decisions/0011`).
 
 **Target roster: 11 items per slot** — 5 Common, 3 Rare, 2 Epic, 1 Legendary. Six slots, so 66 garments at launch.
 

@@ -1,10 +1,13 @@
 ---
-status: awaiting selection
+status: superseded — now the backlog
 purpose: Candidate skin families, for Noah to pick the launch roster from.
 depends-on: 03-cosmetics/animation-ladder.md, 03-cosmetics/rarity-tiers.md
 ---
 
 # Skin Candidates
+
+> **Selection made** — the launch roster is in `skin-roster.md`. This file
+> stays as the family backlog for catalogue expansion (`decisions/0011`).
 
 **Target roster: 11 skin families** — 5 Common, 3 Rare, 2 Epic, 1 Legendary (cosmic).
 

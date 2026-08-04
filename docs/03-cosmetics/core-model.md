@@ -21,6 +21,15 @@ The Void Weave headgear skin applies to *any* headgear the player owns. This is 
 
 Garment-specific skins are reserved for Legendary and above, where exclusivity is the point.
 
+## Every garment has a no-skin base
+
+A garment must look finished with no skin applied. The base is a
+deliberately plain flat treatment baked into the garment asset — Common
+grade at most — so a player who owns zero skins still has a coherent
+outfit, and any skin applied always reads as an upgrade. The base is not
+a skin: it occupies no inventory slot, cannot be salvaged, and is what a
+garment reverts to when its skin is removed.
+
 ## What this produces
 
 At the launch roster of 11 gear and 11 skins per slot:
