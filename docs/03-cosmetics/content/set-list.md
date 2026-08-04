@@ -1,9 +1,16 @@
 ---
-status: draft — needs a decision, see below
+status: backlog — post-v1 seasonal concepts
 purpose: Seasonal set concepts, and how they relate to the permanent skin pool.
 ---
 
 # Sets
+
+> **The structural ambiguity below is resolved.** v1 has no seasons
+> (`decisions/0008`); launch sets are three permanent-pool families given
+> a Legendary keystone piece — designated in `skin-roster.md`. The
+> mixed-tier seasonal concepts below are the backlog for when seasons
+> return (`00-project/roadmap.md`, question 4), and the recommendation to
+> keep the cosmic out of any set was adopted.
 
 ## First, a structural ambiguity to resolve
 

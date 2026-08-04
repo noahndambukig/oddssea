@@ -47,6 +47,22 @@ though the clothing is a hole cut in reality. The starfield holds still
 while the avatar moves. Particles: slow motes drifting from the "hole."
 Equip flourish: the garment darkens to nothing, then stars fade in.
 
+## Launch sets
+
+Three families are the launch sets, each gaining a **Legendary-grade
+keystone piece in the shirt slot** (the largest canvas) — the family's
+treatment pushed to the full Legendary motion budget:
+
+| Set | Family tier | Keystone (shirt slot) |
+|---|---|---|
+| **Tidepool** | Epic | The drift becomes rolling water with a wet-light caustic pass |
+| **Bloomcycle** | Epic | The flowers bloom in waves with drifting petals |
+| **Chrome Dip** | Rare | Liquid mirror — the surface visibly flows |
+
+**Void Weave is deliberately not a set** — the cosmic stays a pure chase,
+not a checklist. Set bonuses and completion rewards per `../sets.md`;
+Set Crate targeting per `../crates.md`.
+
 ## Build notes
 
 - **Test full Void Weave early.** The family exists in all six slots and
@@ -61,4 +77,6 @@ Equip flourish: the garment darkens to nothing, then stars fade in.
   expansion candidate.
 
 Struck candidates remain in `skin-candidates.md` as the expansion backlog
-(`decisions/0011`).
+(`decisions/0011`). **Shipping copies: `data/skins.json`, `data/sets.json`,
+`data/drop-tables.json`** (content version 1.0.0) — the game reads the
+JSON, per `decisions/0015`.

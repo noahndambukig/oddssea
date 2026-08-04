@@ -20,15 +20,15 @@ before updating the doc.
 
 | Figure | Committed | Casual | Source |
 |---|---|---|---|
-| Basic crates opened/week (typical bettor) | 47 | 20 | bankroll.py |
-| Handle/week (Shells) | ~58,000 | ~25,000 | bankroll.py |
-| Pearl income/week | ~3,300 | ~1,400 | bankroll.py |
+| Basic crates opened/week (typical bettor) | 53 | 19 | bankroll.py |
+| Handle/week (Shells) | ~74,000 | ~27,000 | bankroll.py |
+| Pearl income/week | ~4,200 | ~1,550 | bankroll.py |
 | Busts/week, typical stake sizing | 0 | 0 | bankroll.py |
-| Shell destruction ratio | ~0.90 | ~0.96 | bankroll.py |
-| First Legendary, median / p90 (weeks) | 1.3 / 3.8 | 3.2 / 9.5 | crate-game.py |
-| 200-pity fire rate | ~13% | ~13% | crate-game.py |
-| Legendaries/year | ~31 | ~12 | crate-game.py |
-| Set completion, median / p90 (weeks) | 3 / 9 | 7 / 21 | crate-game.py |
+| Shell destruction ratio (all three faucets) | ~0.92 | ~0.91 | bankroll.py |
+| First Legendary, median / p90 (weeks) | 1.3 / 3.8 | 3.7 / 10.5 | crate-game.py |
+| 200-pity fire rate | ~14% | ~14% | crate-game.py |
+| Legendaries/year | ~32 | ~11 | crate-game.py |
+| Set completion, median / p90 (weeks) | 3 / 8 | 8 / 22 | crate-game.py |
 
 Behavioral assumptions (bets/day, stake fractions, game mix) are declared
 constants at the top of `bankroll.py` — they are guesses until playtests

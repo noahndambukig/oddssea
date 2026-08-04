@@ -34,6 +34,7 @@ Task structure lives in `01-game/tasks.md`; the payouts live here.
 | Set completed (one-time, `decisions/0005`) | 1,500 |
 | Referral — referrer, on referee earning 300 | 2,000 |
 | Referral — referee starter boost | 250 |
+| Visitor tip (`decisions/0016`) | 10 per tip · **cap 50/day received**, 1 tip per visitor per closet per day |
 
 The referral threshold (300) sits below the onboarding chain total (400)
 by design — see `01-game/tasks.md`.
@@ -58,8 +59,31 @@ one casual day funds 35 minimum bets, the comeback floor.
 | Blackjack | 1.5% effective | ~2.0 |
 
 At the reference mix (40% races, 30% instant, 20% roulette, 10%
-blackjack) the blended edge is ~5.6%. Reference handle: **~58,000/week
-committed, ~25,000/week casual**.
+blackjack) the blended edge is ~5.6%. Reference handle: **~74,000/week
+committed, ~27,000/week casual**.
+
+### Game parameters
+
+| Parameter | Value |
+|---|---|
+| Crash multiplier cap | 1,000× |
+| Race field | 6–8 racers from a roster of ~14 |
+| Race overround | the races edge above |
+
+### Lottery — validated by simulation
+
+The lottery is **positive-EV by design** (`decisions/0014`): pot = 1.5×
+ticket sales, house match accounted as a second, capped Shell faucet.
+Tickets earn **no Pearls**. The bankroll sim confirms the subsidy is
+absorbed by recycling — crate prices were re-derived to hold the
+crates-per-week anchor after it landed.
+
+| Parameter | Value |
+|---|---|
+| Ticket price | 50 Shells |
+| Daily draw cap | 3 tickets per player · 1 winner |
+| Weekly draw cap | 10 tickets per player (the free task ticket counts) · 3 winners, split 60/30/10 |
+| Max expected daily subsidy per player | ~75 Shells (3 × 50 × 0.5) — sized like one daily task |
 
 ## Pearls in — the wager reward
 
@@ -67,18 +91,19 @@ Per bet: **0.75 × stake × edge**, plus on a win **0.30 × stake × edge ×
 odds**. Expected total ≈ 1.05 Pearls per Shell of theoretical loss,
 identical across games (farm-proof); long-odds wins pay visibly more.
 
-Reference Pearl income: **~3,300/week committed, ~1,400/week casual**.
+Reference Pearl income: **~4,200/week committed, ~1,550/week casual**
+(includes the knock-on handle from the lottery and tip faucets).
 
 ## Pearls out — crates, shop and sinks
 
 | Sink | Pearls | Notes |
 |---|---|---|
-| Basic Gear Crate | 60 | Legendary 1% |
-| Basic Skin Crate | 80 | skins priced above gear deliberately |
-| Premium Gear Crate | 240 | Legendary 5%, Epic 20% |
-| Premium Skin Crate | 320 | |
-| Set Crate | 90 | keystone 2%; hybrid targeting (`decisions/0009`) |
-| Direct purchase (featured in weekly rotation) | 1.5× expected crate-route cost | e.g. Legendary ≈ 9,500 |
+| Basic Gear Crate | 70 | Legendary 1% |
+| Basic Skin Crate | 90 | skins priced above gear deliberately |
+| Premium Gear Crate | 280 | Legendary 5%, Epic 20% |
+| Premium Skin Crate | 360 | |
+| Set Crate | 100 | keystone 2%; hybrid targeting (`decisions/0009`) |
+| Direct purchase (featured in weekly rotation) | 1.5× expected crate-route cost | e.g. Legendary ≈ 11,000 |
 | Fusion 4 Common → Rare | 50 + items | |
 | Fusion 4 Rare → Epic | 150 + items | |
 | Fusion 4 Epic → Legendary | 500 + items | |
@@ -88,6 +113,8 @@ Reference Pearl income: **~3,300/week committed, ~1,400/week casual**.
 | Showcase pedestal | 1,200 | one-off |
 | Marketplace listing | 20 | pure burn |
 | Marketplace sale tax | 10% | pure burn |
+| Weekly rotation: featured family | direct price (1.5×) | one family per week (`decisions/0016`) |
+| Weekly rotation: spotlight Set Crate | 80 (20% off) | one set per week |
 
 Salvage (duplicates → Pearls): Common 4 · Rare 12 · Epic 45 · Legendary
 180.
@@ -100,25 +127,31 @@ Crates per chase. Drop tables live in `03-cosmetics/crates.md`.
 
 | Outcome | Committed | Casual |
 |---|---|---|
-| Basic crates/week | ~47 | ~20 |
-| First Legendary (median / p90) | 1.3 / 3.8 wk | 3.2 / 9.5 wk |
-| Pity fires | ~13% of chases | ~13% |
-| Legendaries/year | ~31 | ~12 |
-| Set completion (median / p90) | 3 / 9 wk | 7 / 21 wk |
+| Basic crates/week | ~53 | ~19 |
+| First Legendary (median / p90) | 1.3 / 3.8 wk | 3.7 / 10.5 wk |
+| Pity fires | ~14% of chases | ~14% |
+| Legendaries/year | ~32 | ~11 |
+| Set completion (median / p90) | 3 / 8 wk | 8 / 22 wk |
 | Busts/week (typical stake sizing) | 0 | 0 |
-| Shell destruction ratio | ~0.90 | ~0.96 |
+| Shell destruction ratio | ~0.92 | ~0.91 |
 
 ## The tensions to watch
 
-**The committed destruction ratio is 0.90**, so a committed player's
-balance drifts up ~350 Shells/week. Mild, but if playtests show hoarding,
-the lever is the race share of the game mix (races carry the fat edge) —
-not task payouts, and never visible price rises.
+**Destruction sits at ~0.92 for both profiles** — above the 0.90 floor
+but with little headroom, because three faucets now feed one sink. Every
+new faucet must be re-simulated before it ships; the lottery and tip
+faucets each pushed crates/week off-anchor when added and were sized
+back to fit.
 
-**The casual set-chase p90 is 21 weeks.** The rotation buyout is what caps
+**Tips are deliberately a garnish** (10 Shells, 50/day cap). Tips
+correlate with closet depth, so a large tip faucet widens the
+committed/casual gap rather than lifting both — the cap is what keeps
+tipping social rather than economic.
+
+**The casual set-chase p90 is 22 weeks.** The rotation buyout is what caps
 the tail; if playtests show casuals stalling at 5/6, tighten the rotation
 interval before touching drop rates.
 
-**Catalogue expansion is an economy input** (`decisions/0011`): ~31
+**Catalogue expansion is an economy input** (`decisions/0011`): ~32
 Legendaries/year for committed players means the Legendary pool must grow
 by roughly one item per month or the top of the catalogue runs dry.

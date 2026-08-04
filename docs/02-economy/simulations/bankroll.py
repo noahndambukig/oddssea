@@ -21,6 +21,17 @@ INCOME = {"committed": 500, "casual": 350}
 ACTIVE_DAYS = {"committed": 7, "casual": 4}
 BETS_PER_DAY = {"committed": 80, "casual": 45}
 
+# lottery house-match subsidy (decision 0014), EV-smoothed net income:
+# committed maxes tickets (3/day, 10/wk), casual buys ~1/day + 5/wk.
+# net = spend * 0.5 (pot pays 1.5x sales back, caps in currency-model.md)
+LOTTERY_DAILY_NET = {"committed": 75, "casual": 25}
+LOTTERY_WEEKLY_NET = {"committed": 250, "casual": 125}
+
+# visitor tips received (decision 0016): 10 Shells/tip, cap 50/day.
+# Deliberately a garnish — tips correlate with popularity, so a large
+# tip faucet widens the committed/casual gap rather than lifting both.
+TIPS_DAILY = {"committed": 25, "casual": 8}
+
 # game mix (share of bets), edge, representative decimal odds
 GAMES = [  # (name, weight, edge, odds)
     ("races",     0.40, 0.100, 5.0),
@@ -33,13 +44,13 @@ GAMES = [  # (name, weight, edge, odds)
 PEARL_A = 0.75
 PEARL_B = 0.30
 
-BASIC_CRATE_PRICE = 70  # Pearls
+BASIC_CRATE_PRICE = 80  # Pearls, blended: gear 70 / skin 90 at an even mix
 
 # betting archetypes: stake as fraction of current bankroll
 ARCHETYPES = {"cautious": 0.02, "typical": 0.05, "aggressive": 0.10, "all-in": 1.00}
 
 WEEKS = 26
-TRIALS = 2000
+TRIALS = 12000  # //100 runs per archetype; raised for run-to-run stability
 
 
 def simulate(profile, frac):
@@ -47,9 +58,11 @@ def simulate(profile, frac):
     bank = 0.0
     busts = handle = theo = pearls = 0.0
     for day in range(WEEKS * 7):
+        if day % 7 == 0:
+            bank += LOTTERY_WEEKLY_NET[profile]
         if day % 7 >= days:
             continue
-        bank += income
+        bank += income + LOTTERY_DAILY_NET[profile] + TIPS_DAILY[profile]
         for _ in range(bpd):
             if bank < MIN_BET:
                 busts += 1
@@ -73,11 +86,16 @@ def simulate(profile, frac):
 if __name__ == "__main__":
     for profile in INCOME:
         print(f"\n== {profile} (income {INCOME[profile]}/day x {ACTIVE_DAYS[profile]} days) ==")
+        weekly_faucet = (INCOME[profile] + LOTTERY_DAILY_NET[profile]
+                         + TIPS_DAILY[profile]) * ACTIVE_DAYS[profile] \
+            + LOTTERY_WEEKLY_NET[profile]
         for name, frac in ARCHETYPES.items():
             runs = [simulate(profile, frac) for _ in range(TRIALS // 100)]
             busts = mean(r[0] for r in runs)
             handle = mean(r[1] for r in runs)
+            theo = mean(r[2] for r in runs)
             pearls = mean(r[3] for r in runs)
             crates = pearls / BASIC_CRATE_PRICE
             print(f"  {name:10s} busts/wk {busts:5.2f}  handle/wk {handle:9.0f}  "
-                  f"pearls/wk {pearls:7.0f}  basic crates/wk {crates:5.1f}")
+                  f"pearls/wk {pearls:7.0f}  basic crates/wk {crates:5.1f}  "
+                  f"destruction {theo / weekly_faucet:4.2f}")

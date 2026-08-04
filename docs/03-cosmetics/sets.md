@@ -17,7 +17,8 @@ This structure does three useful things at once:
 
 Each set mixes tiers deliberately: **five Common-to-Epic pieces plus one Legendary keystone.** The set is achievable, but the keystone is the wall — and the wall is where the top-end sink lives.
 
-Candidate sets are listed in `03-cosmetics/content/set-list.md`.
+Launch sets are designated in `content/skin-roster.md`; post-v1 seasonal
+set concepts are in `content/set-list.md`.
 
 ## Set bonuses
 

@@ -59,4 +59,5 @@ not six competing maxima. It pairs with the cosmic Legendary skin family.
   The 66 garments must each look finished unskinned.
 
 Struck candidates remain in `gear-candidates.md` as the expansion backlog
-(`decisions/0011`).
+(`decisions/0011`). **Shipping copy: `data/gear.json`** (content version
+1.0.0) — the game reads the JSON, per `decisions/0015`.

@@ -16,13 +16,13 @@ BASIC_RATES = [("common", 0.67), ("rare", 0.25), ("epic", 0.07), ("legendary", 0
 BASIC_PITY = 200
 PREMIUM_RATES = [("common", 0.35), ("rare", 0.40), ("epic", 0.20), ("legendary", 0.05)]
 PREMIUM_PITY = 40
-BASIC_PRICE, PREMIUM_PRICE = 70, 280  # Pearls
+BASIC_PRICE, PREMIUM_PRICE = 80, 320  # Pearls (blended; gear/skin split in currency-model)
 
-CRATES_PER_WEEK = {"committed": 52, "casual": 21}
+CRATES_PER_WEEK = {"committed": 53, "casual": 19}
 LEGENDARY_CATALOGUE = 12  # distinct Legendary items at launch
 
 # set chase: six pieces, keystone Legendary; set crate is single-tier
-SET_PRICE = 90
+SET_PRICE = 100
 SET_RATES = [("common", 0.40), ("rare", 0.34), ("epic", 0.24), ("legendary", 0.02)]
 SET_PITY = 100          # keystone guarantee within a chase
 SET_SHARE = 0.30        # share of pearl income a chaser routes to set crates
@@ -110,7 +110,7 @@ if __name__ == "__main__":
         print(f"\n== {profile} ({cpw} basic crates/wk) ==")
         print(f"  first Legendary: median {sorted(weeks)[len(weeks)//2]:.1f} wk, "
               f"p90 {q[8]:.1f} wk | pity fires {pity_rate*100:.1f}% | ~{legs:.0f} Legendaries/yr")
-    for profile, pearls in {"committed": 3650, "casual": 1450}.items():
+    for profile, pearls in {"committed": 4216, "casual": 1553}.items():
         comps = [set_completion(pearls) for _ in range(400)]
         print(f"\n  {profile} set chase ({SET_SHARE:.0%} of ~{pearls} pearls/wk): "
               f"median {median(comps):.0f} wk, p90 {quantiles(comps, n=10)[8]:.0f} wk")

@@ -88,9 +88,8 @@ player finishes the tour funded, dressed and having seen the two loops
 ## Open questions
 
 - **Race cadence interval.** Minutes-scale, but the exact number is a
-  tuning decision that needs a live floor to observe.
-- **Lottery ticket mechanics** (price, ticket caps, draw structure) —
-  specced in `game-modes.md`.
+  tuning decision that needs a live floor to observe. (Lottery mechanics,
+  formerly open here, are specced in `game-modes.md`.)
 
 ## Numbers
 

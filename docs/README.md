@@ -29,6 +29,8 @@ purpose: Index of every spec and its current state. Keep this current — it is 
 | `01-game/core-loop.md` | Draft |
 | `01-game/tasks.md` | Draft |
 | `01-game/game-modes.md` | Draft |
+| `01-game/racers.md` | Draft — 14-racer roster authored |
+| `03-cosmetics/content/data/*.json` | Shipped — content version 1.0.0 (`decisions/0015`) |
 | `02-economy/currency-model.md` | Agreed — simulated, not playtested |
 | `02-economy/dust.md` | Superseded (`decisions/0005`) |
 | `02-economy/guardrails.md` | Agreed — simulated, not playtested |
@@ -40,13 +42,11 @@ purpose: Index of every spec and its current state. Keep this current — it is 
 | `03-cosmetics/content/set-list.md` | Backlog — post-v1 seasonal concepts |
 | `04-technical/platform.md` | Agreed — implementation begun (`web/`) |
 | `04-technical/hosting.md` | Agreed — implementation begun (`infra/`) |
-| `04-technical/data-model.md` | **Not written** |
+| `04-technical/data-model.md` | Draft (`decisions/0015`) |
 | `05-production/*` | Draft |
-| `06-risks/compliance.md` | Draft — **written before the genre was settled, needs revisiting** |
+| `06-risks/compliance.md` | Agreed — v1 posture (no real-money path); legal review before monetisation or store submission |
 
 ## Suggested order for what's next
 
-1. **`06-risks/compliance.md`** — rewrite for a gambling simulator. Age rating, store category and whether Shells are ever purchasable all constrain the design, and they are cheaper to know now than after the economy is built.
-2. **`04-technical/data-model.md`** — the cosmetics, economy and game specs imply a schema (ledger, inventory, dex progress, tables, racer form). Write it down before code starts guessing.
-3. Move the locked rosters to `03-cosmetics/content/data/*.json` (doc-conventions rule 6), and write the racer roster content pass.
-4. Validate the lottery subsidy in the bankroll sim (roadmap question 11), then review the `01-game/` drafts to `agreed`.
+1. Review the drafts (`01-game/core-loop`, `tasks`, `game-modes`, `racers`, `04-technical/data-model`) to `agreed`.
+2. First deploy, then build against the specs — every planned spec now exists and all content is chosen and shipped as data.

@@ -30,7 +30,7 @@ export class CicdStack extends cdk.Stack {
     super(scope, id, props);
 
     const { config } = props;
-    const { owner, repo, branch } = config.github;
+    const { owner, repo, branch, ownerId, repoId } = config.github;
 
     // One provider per issuer URL per account — see config.ts. When one
     // already exists (another project wired up GitHub Actions before), it is
@@ -65,11 +65,20 @@ export class CicdStack extends cdk.Stack {
             // the provider trusts GitHub as an issuer, not you specifically.
             // This narrows it to one branch of one repo.
             //
+            // Two accepted forms (an array here means OR): the classic
+            // name-based sub, and GitHub's newer ID-embedded sub
+            // (owner@ID/repo@ID) — IDs survive renames and cannot be
+            // re-registered, which is what defeats resurrection attacks.
+            // Verified against a real token via CloudTrail on 2026-08-04.
+            //
             // Other useful shapes, for later:
             //   repo:owner/repo:pull_request       — PR runs
             //   repo:owner/repo:environment:prod   — GitHub Environments
             // -------------------------------------------------------------
-            [`${GITHUB_ISSUER}:sub`]: `repo:${owner}/${repo}:ref:refs/heads/${branch}`,
+            [`${GITHUB_ISSUER}:sub`]: [
+              `repo:${owner}/${repo}:ref:refs/heads/${branch}`,
+              `repo:${owner}@${ownerId}/${repo}@${repoId}:ref:refs/heads/${branch}`,
+            ],
           },
         },
         'sts:AssumeRoleWithWebIdentity',

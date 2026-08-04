@@ -41,8 +41,9 @@ first deploy, so environments are reproducible.
 ## What this deliberately does not do
 
 - **No real-money payment infrastructure.** Shells are not purchasable, so
-  there is no PCI scope, no store billing, no payment provider. Adding one
-  is a decision-entry-level change (see `00-project/roadmap.md`, question 5).
+  there is no PCI scope, no store billing, no payment provider. This is
+  the compliance wall (`../06-risks/compliance.md`); adding a payment
+  path requires a decision entry and legal review first.
 - No multi-region, no Kubernetes, no microservices. One API, one database,
   until scale forces otherwise.
 

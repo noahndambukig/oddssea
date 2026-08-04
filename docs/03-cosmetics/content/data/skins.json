@@ -1,0 +1,28 @@
+{
+  "content_version": "1.0.0",
+  "_note": "One definition per family; each applies to all six slots via the mask channel (core-model.md). Human roster of record: ../skin-roster.md. Motion budgets per ../../animation-ladder.md.",
+  "families": [
+    { "id": "chalk", "name": "Chalk", "tier": "common", "motion": "none",
+      "treatment": "Matte off-white, faint paper grain. Light neutral." },
+    { "id": "ink", "name": "Ink", "tier": "common", "motion": "none",
+      "treatment": "Flat near-black with one sharp accent line. Dark neutral." },
+    { "id": "cherrywood", "name": "Cherrywood", "tier": "common", "motion": "none",
+      "treatment": "Deep red-brown with cream." },
+    { "id": "buttercream", "name": "Buttercream", "tier": "common", "motion": "none",
+      "treatment": "Soft pale yellow and white." },
+    { "id": "regatta", "name": "Regatta", "tier": "common", "motion": "none",
+      "treatment": "Crisp navy and white." },
+    { "id": "chrome-dip", "name": "Chrome Dip", "tier": "rare", "motion": "none",
+      "treatment": "Mirrored metal with a hard specular band." },
+    { "id": "tiger-maple", "name": "Tiger Maple", "tier": "rare", "motion": "none",
+      "treatment": "Polished figured wood grain." },
+    { "id": "denim-raw", "name": "Denim Raw", "tier": "rare", "motion": "none",
+      "treatment": "Woven indigo with contrast stitching." },
+    { "id": "tidepool", "name": "Tidepool", "tier": "epic", "motion": "loop",
+      "treatment": "Slow blue-green gradient drift under a wet sheen." },
+    { "id": "bloomcycle", "name": "Bloomcycle", "tier": "epic", "motion": "loop",
+      "treatment": "Printed flowers that slowly open and close." },
+    { "id": "void-weave", "name": "Void Weave", "tier": "legendary", "motion": "full",
+      "treatment": "Stars visible through black cloth; the starfield holds still while the avatar moves. Slow motes drift from the hole. Equip flourish: darkens to nothing, then stars fade in." }
+  ]
+}

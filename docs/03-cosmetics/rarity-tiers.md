@@ -30,5 +30,5 @@ For skins, the equivalent rule is the animation ladder — see `animation-ladder
 Mythic items are single instances. Exactly one exists across the entire app, ever.
 
 - **Never sold in crates.** Sources: seasonal tournament placement, first-discovery bounties, anniversary awards, one-of-one auctions, and the first player to complete each season's set.
-- **Provenance is displayed.** The item permanently shows who has owned it, in order. When a Mythic changes hands it should feel like news.
+- **Provenance is displayed.** The item permanently shows who has owned it, in order, with every Pearl price paid. **Mythics are tradeable** (`decisions/0016`) and every sale is announced site-wide — the publicity is a mitigation, not just drama. Listings can be suspended platform-wide if off-platform cash trading appears.
 - Budget 6–12 Mythics per year. Scarcity is the entire product here.

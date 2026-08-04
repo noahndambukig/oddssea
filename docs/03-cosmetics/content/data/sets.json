@@ -1,0 +1,16 @@
+{
+  "content_version": "1.0.0",
+  "_note": "Launch sets per ../skin-roster.md and decisions/0008. Bonuses per ../../sets.md; completion bonus amount in 02-economy/currency-model.md.",
+  "sets": [
+    { "id": "set.tidepool", "family": "tidepool", "keystone_slot": "shirt",
+      "keystone": { "id": "skin.tidepool.keystone", "name": "Tidepool Keystone",
+        "treatment": "The drift becomes rolling water with a wet-light caustic pass. Legendary motion budget." } },
+    { "id": "set.bloomcycle", "family": "bloomcycle", "keystone_slot": "shirt",
+      "keystone": { "id": "skin.bloomcycle.keystone", "name": "Bloomcycle Keystone",
+        "treatment": "The flowers bloom in waves with drifting petals. Legendary motion budget." } },
+    { "id": "set.chrome-dip", "family": "chrome-dip", "keystone_slot": "shirt",
+      "keystone": { "id": "skin.chrome-dip.keystone", "name": "Chrome Dip Keystone",
+        "treatment": "Liquid mirror; the surface visibly flows. Legendary motion budget." } }
+  ],
+  "excluded_from_sets": ["void-weave"]
+}
