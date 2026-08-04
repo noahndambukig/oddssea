@@ -57,6 +57,17 @@ export interface AppConfig {
     repo: string;
     /** Only this branch may deploy. Anything else is refused by IAM. */
     branch: string;
+    /**
+     * Numeric IDs GitHub embeds in its newer OIDC sub claims
+     * (repo:owner@OWNERID/repo@REPOID:ref:...). Names are reusable — a
+     * deleted repo or renamed account can be re-registered by someone else,
+     * inheriting name-based trust ("resurrection attack"); the IDs are
+     * immutable. Find them at api.github.com/users/<owner> and
+     * api.github.com/repos/<owner>/<repo>, or in CloudTrail's record of a
+     * rejected AssumeRoleWithWebIdentity.
+     */
+    ownerId: string;
+    repoId: string;
   };
 
   /**
@@ -85,6 +96,8 @@ export const configs: Record<string, AppConfig> = {
       owner: 'noahndambukig',
       repo: 'oddssea',
       branch: 'main',
+      ownerId: '210443285',
+      repoId: '1317725621',
     },
 
     createGithubOidcProvider: true,
