@@ -1,0 +1,23 @@
+{
+  "name": "@oddssea/infra",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "synth": "cdk synth",
+    "diff": "cdk diff Oddssea-dev-App",
+    "deploy": "cdk deploy Oddssea-dev-App",
+    "deploy:cicd": "cdk deploy Oddssea-dev-Cicd",
+    "bootstrap": "cdk bootstrap"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "aws-cdk": "^2.1000.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.170.0",
+    "constructs": "^10.4.2"
+  }
+}

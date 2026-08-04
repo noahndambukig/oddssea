@@ -1,0 +1,73 @@
+name: Deploy
+
+# Continuous deployment: every push to main goes to AWS.
+on:
+  push:
+    branches: [main]
+  # Lets you re-run a deploy from the Actions tab without pushing a commit.
+  workflow_dispatch:
+
+# Two runs deploying the same stack at once would fight over CloudFormation's
+# lock. Queue them instead.
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+permissions:
+  # THE important line. Allows this workflow to request a signed OIDC token
+  # from GitHub to present to AWS. Without it, the credentials step fails
+  # with a permissions error that mentions neither OIDC nor tokens.
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build frontend
+        run: npm run build
+
+      # No access keys anywhere in this repo or its settings. This step
+      # exchanges GitHub's signed token for one-hour AWS credentials via
+      # AssumeRoleWithWebIdentity. AWS verifies the token's signature and
+      # checks its repo+branch claim against the trust policy defined in
+      # infra/lib/cicd-stack.ts before agreeing.
+      - name: Get temporary AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+          role-session-name: gha-oddssea-${{ github.run_id }}
+
+      # Prints the assumed role — proof in every run's log that the workflow
+      # is operating as the scoped deploy role, not a stored key.
+      - name: Who am I
+        run: aws sts get-caller-identity
+
+      # --require-approval never: locally, CDK pauses to show you IAM and
+      # security-group changes before applying them — leave that on and read
+      # it. In CI there is nobody to answer the prompt, so it is disabled
+      # and the review happens in the pull request instead.
+      - name: Deploy
+        run: npx cdk deploy Oddssea-dev-App --require-approval never
+        working-directory: infra
+
+      - name: Show stack outputs
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name Oddssea-dev-App \
+            --query 'Stacks[0].Outputs[].{Key:OutputKey,Value:OutputValue}' \
+            --output table

@@ -132,7 +132,7 @@ requires a decision entry.
 | Gear roster | Chosen — 11 families (`docs/decisions/0013`), `docs/03-cosmetics/content/gear-roster.md` |
 | Skin roster | Chosen — 11 families, cosmic is Void Weave — `docs/03-cosmetics/content/skin-roster.md` |
 | Economy | Agreed — wager economy simulated (`docs/decisions/0005`–`0011`), **not playtested** |
-| Launch game roster | Chosen — 7 games, `docs/decisions/0007` — **specs not yet written** |
+| Launch game roster | Chosen — 7 games (`docs/decisions/0007`) — specs drafted, `docs/01-game/game-modes.md` |
 | Core game loop | Drafted — `docs/01-game/` (core-loop + tasks), awaiting review |
 | Platform + hosting | Agreed — web-first PWA on AWS, `docs/04-technical/` |
 | Deployment skeleton | Increment A built (`web/`, `infra/`, CI/CD) — **first deploy pending**; walkthrough in `infra/README.md` |

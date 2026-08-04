@@ -11,7 +11,7 @@ purpose: Decisions that are blocking or will become blocking.
 
 ~~**2. Skin roster, and which cosmic Legendary.**~~ Resolved 2026-08-03: 11 families chosen, cosmic is Void Weave — `03-cosmetics/content/skin-roster.md`.
 
-**10. Which three skin families are the launch sets?** Each gets a Legendary keystone piece (`03-cosmetics/sets.md`). Proposal: Tidepool + Bloomcycle (the two Epic chases) + Chrome Dip (the affordable Rare set), with Void Weave deliberately *not* a set so the cosmic stays a pure chase. Blocks Set Crate content.
+~~**10. Which three skin families are the launch sets?**~~ Resolved 2026-08-04: Tidepool, Bloomcycle and Chrome Dip, keystones in the shirt slot; Void Weave deliberately excluded — `03-cosmetics/content/skin-roster.md`.
 
 **3. Weekly rotation design.** What the rotating shop features each week, the featured-set discount or bonus-odds size, and the rotation cadence (`decisions/0009`). Blocks the shop and Set Crate specs.
 
@@ -21,7 +21,9 @@ purpose: Decisions that are blocking or will become blocking.
 
 **5. Are Shells ever purchasable with real money?** Now the load-bearing compliance question: purchasable Shells feeding wagers and crates is real-money gambling adjacency — see `06-risks/compliance.md`.
 
-**6. The wager-economy numbers.** House edge, Pearl reward coefficients, task faucet sizes, comeback-floor size, completion bonus size, crate prices in Pearls. Blocked on the bankroll-ruin simulation; blocks the `02-economy/` rewrite. See `decisions/0005`.
+~~**6. The wager-economy numbers.**~~ Resolved 2026-08-03: derived by `02-economy/simulations/bankroll.py` and `crate-game.py`; `02-economy/` rewritten (decisions 0009–0011).
+
+~~**11. Validate the lottery house-match subsidy.**~~ Resolved 2026-08-04: the subsidy recycles fully (committed destruction ≈ 1.0); crate prices re-derived to hold the crates/week anchor — `02-economy/simulations/README.md`.
 
 ## Blocking design of the flex layer
 

@@ -1,4 +1,22 @@
+# python (simulations)
 __pycache__/
 *.pyc
-.DS_Store
 .venv/
+
+# os
+.DS_Store
+
+# node
+node_modules/
+
+# build output
+dist/
+
+# cdk synthesis output
+cdk.out/
+.cdk.staging/
+
+# local-only config — never commit real values
+web/.env.local
+.env
+.env.local

@@ -23,7 +23,8 @@ sidebar on desktop; wager slips are bottom sheets on mobile, side panels on
 desktop.
 
 **The PWA layer** makes it feel like an app: a web manifest (`display:
-standalone`, home-screen icon) and a service worker caching the app shell
+standalone`, home-screen icon — the sailboat, see
+`../00-project/identity.md`) and a service worker caching the app shell
 and cosmetic assets so second launch is instant.
 
 **Client stack:** TypeScript throughout. **React** renders the UI screens,
