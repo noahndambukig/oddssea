@@ -31,10 +31,10 @@ GitHub Actions ──(OIDC: borrows a 1-hour AWS identity)──► your AWS acc
                                    │          CloudFront reads │
                               CloudFront  ◄── the CDN, HTTPS   │
                                    │                           │
-                    https://dev.oddssea.xyz ◄── Route53 ───────┘
+                    https://oddssea.xyz ◄── Route53 ───────┘
 ```
 
-Reading it bottom-up: a browser asks DNS where `dev.oddssea.xyz` is, DNS
+Reading it bottom-up: a browser asks DNS where `oddssea.xyz` is, DNS
 answers "CloudFront", CloudFront serves the files from a private S3 bucket,
 and the files got into that bucket because a GitHub workflow — briefly
 wearing an AWS identity — put them there.
@@ -137,7 +137,7 @@ root servers        "ask the .xyz registry"
       ↓
 .xyz registry       "ask <whichever nameservers oddssea.xyz nominates>"
       ↓
-those nameservers   "dev.oddssea.xyz is <CloudFront>"        ← the actual answer
+those nameservers   "oddssea.xyz is <CloudFront>"            ← the actual answer
 ```
 
 Each arrow is a **delegation**: a parent saying "not mine — ask them." When
@@ -348,7 +348,7 @@ npm run deploy
 
 Two new things happen, watchable in the console mid-deploy:
 
-- **ACM (Certificate Manager):** a certificate for `dev.oddssea.xyz` appears
+- **ACM (Certificate Manager):** a certificate for `oddssea.xyz` appears
   as *Pending validation*, then *Issued* within a few minutes. Click into it
   — the CNAME record ACM required is listed there, and Route53 → your zone
   now contains it: CDK wrote it for you. That record staying published is
@@ -360,7 +360,7 @@ Two new things happen, watchable in the console mid-deploy:
   type: resolves like an A record from outside, but tracks the AWS resource
   behind it and costs nothing to query.
 
-Open **https://dev.oddssea.xyz**. That is your URL now.
+Open **https://oddssea.xyz**. That is your URL now.
 
 ### Third deploy — prove the pipeline
 
@@ -381,7 +381,7 @@ Actions tab). Merge it → **Deploy** runs. Watch the log:
 
 **Done-when check:** edit one visible line in
 [../web/src/App.tsx](../web/src/App.tsx), PR, merge, and confirm the change
-is live at dev.oddssea.xyz without you having touched AWS. That is
+is live at oddssea.xyz without you having touched AWS. That is
 continuous deployment.
 
 ---
@@ -412,12 +412,14 @@ at Cognito. The browser-side half is hand-written in
 [../web/src/auth/](../web/src/auth/) — read `pkce.ts` first; it explains the
 entire trick.
 
-The apex also changes: `oddssea.xyz` now resolves (Cognito requires the
-parent of a custom auth domain to exist) and 302-redirects to the canonical
-`dev.oddssea.xyz` — as does the distribution's generated `*.cloudfront.net`
-name. One origin, everywhere. 302 rather than 301 because the apex is
-promised to a future production cutover, and browsers cache permanent
-redirects long enough to outlive it.
+The site's home also changes with this increment: the app now serves from
+**the apex itself** — `https://oddssea.xyz` — and the original
+`dev.oddssea.xyz` is retired and no longer resolves (decided 2026-08-04).
+This kills two birds: the URL is the one that feels right, and Cognito's
+requirement that a custom auth domain's *parent* resolve is satisfied by the
+canonical record itself. The distribution's generated `*.cloudfront.net`
+name — which alternate domains never disable — 302-redirects to the apex,
+so there is exactly one origin with a working login.
 
 ### Concepts before commands
 
@@ -462,7 +464,7 @@ create. Not stuck. Go do the console safari below while it works.
   (what unlocks the brandable login pages). Under **App integration**, open
   the app client and read the allowed callback URLs — this exact-string
   list is why a stray trailing slash breaks login.
-- **Sign yourself up** at https://dev.oddssea.xyz → Create an account →
+- **Sign yourself up** at https://oddssea.xyz → Create an account →
   verification code arrives by email → confirm → the 18+ gate → you are in,
   and the page shows your claims. Then find yourself: **Users** tab → your
   email. `sub` is the immutable ID that will one day be the foreign key on
@@ -479,8 +481,9 @@ create. Not stuck. Go do the console safari below while it works.
   deliberate exception to everything-as-code: a visual tool for a visual
   artefact. The stack only creates the default style once; CloudFormation
   will not overwrite your design on later deploys.
-- **Prove the redirects:** visit `oddssea.xyz` and the `DistributionDomain`
-  output's `dxxxx.cloudfront.net` — both should land you on dev.
+- **Prove the redirect and the retirement:** the `DistributionDomain`
+  output's `dxxxx.cloudfront.net` should 302 to `oddssea.xyz`, and
+  `dev.oddssea.xyz` should no longer resolve at all.
 
 ### Running the app locally (`npm run dev`)
 

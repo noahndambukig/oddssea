@@ -20,7 +20,7 @@ Start with [docs/README.md](docs/README.md) for the spec index, and
 
 An authenticated skeleton, built in three increments:
 
-- **A — a live URL.** Static page at `https://dev.oddssea.xyz`, deployed by a
+- **A — a live URL.** Static page at `https://oddssea.xyz`, deployed by a
   pipeline with no stored credentials. *(in progress)*
 - **B — login.** Cognito Hosted UI, hand-written PKCE, real accounts.
 - **C — the API.** One Lambda; a public `/health` and a token-guarded `/me`.

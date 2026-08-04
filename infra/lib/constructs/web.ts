@@ -25,14 +25,15 @@ export class Web extends Construct {
   readonly bucket: s3.Bucket;
   readonly distribution: cloudfront.Distribution;
 
-  /** The origin the browser loads the app from, e.g. https://dev.oddssea.xyz */
+  /** The origin the browser loads the app from, e.g. https://oddssea.xyz */
   readonly appUrl: string;
 
   /**
-   * The apex A record (oddssea.xyz → this distribution). Exposed because
-   * Cognito's custom auth domain requires the parent domain to resolve at
-   * creation time, and CloudFormation cannot see that prerequisite — the
-   * Auth construct takes this and declares the dependency explicitly.
+   * The A record for the canonical hostname — the apex, since the app
+   * serves from oddssea.xyz itself. Exposed because Cognito's custom auth
+   * domain requires the PARENT domain (the apex) to resolve at creation
+   * time, and CloudFormation cannot see that prerequisite — the Auth
+   * construct takes this and declares the dependency explicitly.
    */
   readonly apexRecord?: route53.ARecord;
 
@@ -68,9 +69,6 @@ export class Web extends Construct {
 
       certificate = new acm.Certificate(this, 'Certificate', {
         domainName: hostname,
-        // The apex rides on the same certificate as a subject-alternative
-        // name, so the redirect below can serve oddssea.xyz over HTTPS.
-        subjectAlternativeNames: [config.domainName],
         // DNS validation: ACM asks for a specific CNAME record to be
         // published as proof of domain control. Because the zone is in this
         // account, CDK writes that record itself and the certificate
@@ -83,18 +81,12 @@ export class Web extends Construct {
     /**
      * Canonical-origin redirect, evaluated at the edge on every request.
      *
-     * The distribution answers on three names: dev.oddssea.xyz (canonical),
-     * oddssea.xyz (the apex), and its generated *.cloudfront.net hostname,
-     * which alternate domain names never disable. Serving the app on all
-     * three would break logins started anywhere but dev — OAuth callbacks
-     * are registered for the canonical origin only — so every other host
-     * bounces. The condition is "host ≠ canonical", not "host = apex", to
-     * cover the generated name and anything added later.
-     *
-     * 302, not 301, deliberately: the apex is promised to a future prod
-     * cutover, and browsers cache permanent redirects long enough to keep
-     * bypassing prod afterwards. Temporary status for a temporary
-     * arrangement.
+     * The distribution answers on its generated *.cloudfront.net hostname
+     * as well as the canonical oddssea.xyz — alternate domain names never
+     * disable the generated one. Serving the app there would break logins
+     * started from it (OAuth callbacks are registered for the canonical
+     * origin only), so any non-canonical host bounces. 302 keeps the
+     * arrangement revisable without fighting browser redirect caches.
      */
     const redirectFunction =
       hostname !== undefined
@@ -141,9 +133,7 @@ function handler(event) {
             ]
           : undefined,
       },
-      // The apex is an alternate name so its requests reach the redirect
-      // function; the function then bounces them to the canonical host.
-      domainNames: hostname ? [hostname, config.domainName!] : undefined,
+      domainNames: hostname ? [hostname] : undefined,
       certificate,
       // Cheapest tier: North America + Europe edges only.
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
@@ -159,24 +149,16 @@ function handler(event) {
     });
 
     if (hostedZone && hostname) {
-      // An alias record pointing the name at CloudFront. Alias is a
-      // Route53-specific record type: it resolves like an A record from the
-      // outside but points internally at an AWS resource, works at the zone
-      // apex where a CNAME cannot, and costs nothing to query.
-      new route53.ARecord(this, 'AliasRecord', {
+      // The canonical record — the zone apex itself, pointing at
+      // CloudFront. Alias is a Route53-specific record type: it resolves
+      // like an A record from the outside but points internally at an AWS
+      // resource, works at the zone apex where a CNAME cannot, and costs
+      // nothing to query. Because this IS the apex, it also satisfies
+      // Cognito's parent-must-resolve check for auth.oddssea.xyz — see the
+      // apexRecord property doc above.
+      this.apexRecord = new route53.ARecord(this, 'AliasRecord', {
         zone: hostedZone,
         recordName: config.subdomain,
-        target: route53.RecordTarget.fromAlias(
-          new targets.CloudFrontTarget(this.distribution),
-        ),
-      });
-
-      // The apex points at the same distribution; the edge function turns
-      // those visits into a 302 to the canonical host. This record is also
-      // what satisfies Cognito's parent-must-resolve check for
-      // auth.oddssea.xyz — see the apexRecord property doc above.
-      this.apexRecord = new route53.ARecord(this, 'ApexRecord', {
-        zone: hostedZone,
         target: route53.RecordTarget.fromAlias(
           new targets.CloudFrontTarget(this.distribution),
         ),
