@@ -16,7 +16,7 @@ purpose: Seasonal set concepts, and how they relate to the permanent skin pool.
 
 Two things in this design are both called "a skin family spanning six slots," and they are not the same thing:
 
-**The permanent pool** — the 11 launch skin families in `skin-candidates.md`. Each family has **one uniform tier** (a Common family is Common in all six slots). These drop from Skin Crates and are always available.
+**The permanent pool** — the 11 launch skin families, now chosen and listed in `skin-roster.md`. Each family has **one uniform tier** (a Common family is Common in all six slots). These drop from Skin Crates and are always available.
 
 **Seasonal sets** — themed families where the six slot-pieces have **mixed tiers**, with one Legendary keystone as the wall. These come from Set Crates, run for one season, then rotate to the vault.
 

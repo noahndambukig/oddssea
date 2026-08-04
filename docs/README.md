@@ -43,7 +43,7 @@ purpose: Index of every spec and its current state. Keep this current — it is 
 | `04-technical/platform.md` | Agreed — implementation begun (`web/`) |
 | `04-technical/hosting.md` | Agreed — implementation begun (`infra/`) |
 | `04-technical/data-model.md` | Draft (`decisions/0015`) |
-| `05-production/*` | Draft |
+| `05-production/*` | Agreed — re-derived for gear families and the racer track |
 | `06-risks/compliance.md` | Agreed — v1 posture (no real-money path); legal review before monetisation or store submission |
 
 ## Suggested order for what's next

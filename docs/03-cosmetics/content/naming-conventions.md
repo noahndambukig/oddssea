@@ -1,5 +1,5 @@
 ---
-status: draft
+status: agreed
 purpose: Rules for naming items, so the catalogue stays coherent at 500 items.
 ---
 

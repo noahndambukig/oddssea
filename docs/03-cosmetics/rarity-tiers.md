@@ -15,7 +15,10 @@ Five tiers. **Tier means rarity of acquisition, never power.** The moment Legend
 | **Legendary** | Gold | ~9% | 1 |
 | **Mythic** | Prismatic | ~1% | 0 — not in the crate catalogue |
 
-Applies identically to both axes: 5 / 3 / 2 / 1 gear per slot, and 5 / 3 / 2 / 1 skin families overall.
+Applies identically to both axes, and since `decisions/0013` in the same
+unit: **5 / 3 / 2 / 1 gear families and 5 / 3 / 2 / 1 skin families**. A
+family carries its tier across all six slots, so the per-slot counts fall
+out at 5 / 3 / 2 / 1 too.
 
 ## The rule that makes tiers readable
 

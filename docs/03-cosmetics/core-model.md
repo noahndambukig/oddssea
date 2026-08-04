@@ -32,18 +32,20 @@ garment reverts to when its skin is removed.
 
 ## What this produces
 
-At the launch roster of 11 gear and 11 skins per slot:
+At the launch roster of 11 gear families and 11 skin families
+(`decisions/0013`):
 
 | | Count |
 |---|---|
 | Garments | 66 |
-| Skin families | 11 (× 6 slots = 66 skin definitions) |
+| Skin definitions | 66 (11 families × 6 slots) |
 | Distinct looks per slot | 121 |
 | Total slot-looks | 726 |
 | Outfit permutations | ~3.1 trillion |
-| Hand-authored asset files | ~157 |
 
-Every garment added later produces 11 new looks instantly. Every skin family added produces 66.
+Every garment added later produces 11 new looks instantly. Every skin
+family added produces 66. Asset counts and art hours live in
+`05-production/asset-budget.md`.
 
 ## Rarity is combinatorial for free
 

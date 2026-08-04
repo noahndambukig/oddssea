@@ -14,14 +14,21 @@ purpose: The six equipment slots, their layer order, and clipping suppression.
 | 5 | **Backpack** | Rear mass | Splits across two layers (rear + straps). |
 | 6 | **Held item** | Expressive | Replaces the "weapon" slot from early drafts. Comedy lives here, and comedy drives sharing. |
 
-Candidate items for each slot are in `03-cosmetics/content/gear-candidates.md`.
+The launch roster is in `content/gear-roster.md`; the shipping copy is
+`content/data/gear.json`.
 
 ## Slot attention is not equal — plan for it
 
-In every game that has shipped a slot-based cosmetic system, headgear and the held item absorb most of the desire while pants and shoes get ignored. Two mitigations, use both:
+In every game that has shipped a slot-based cosmetic system, headgear and the held item absorb most of the desire while pants and shoes get ignored.
+
+**Gear families changed the available mitigations** (`decisions/0013`).
+A family has exactly one garment per slot, so the old advice — ship fewer
+of the quiet slots, price them lower — is no longer possible: slot counts
+are necessarily equal, and crates sell by axis rather than by slot. Two
+mitigations remain, and both now carry more weight:
 
 - **Give the quiet slots exclusive FX types.** Shoes get trails and footprints; pants get cuff particles. Things headgear *cannot* have, so there is a reason to care.
-- **Ship fewer of them and price them lower.** Do not spend equal art budget across slots that do not earn equal attention.
+- **Spend the design attention unequally even though the counts are equal.** Every family gets six pieces regardless; make the pants and shoes the ones that earn their place within the theme rather than filler drawn to complete a set.
 
 ## Layer order (back to front)
 
@@ -53,3 +60,8 @@ Some gear combinations are physically contradictory. Resolve them with hide flag
 - Anything that lifts the avatar off the ground (anti-grav boots, balloon cluster) conflicts with anything else that does
 - Rear-layer items (wing rig, jetpack, orbital pack) compete for the same space
 - Leg-hiding bottoms make the shoes slot inert
+
+At launch exactly one conflict is live: Cosmic's **hover skirt hides the
+anti-grav boots**, recorded as a hide-flag in `content/data/gear.json`.
+Both are in the same family, so full-Cosmic players hit it immediately —
+the preview must say so.
