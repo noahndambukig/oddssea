@@ -8,12 +8,15 @@ depends-on: currency-model.md, ../decisions/0005-wagering-earns-the-cosmetic-cur
 
 ## Non-negotiable rules
 
-**1. The Shell economy has one faucet and one sink.** Tasks pay Shells in;
-the house edge takes them out. No cosmetic, collection state, or owned
-thing ever generates recurring Shells — completion rewards are one-time
-(`decisions/0005`) — and nothing but wagering consumes them. This keeps
-the identity the whole model rests on: lifetime handle ≈ task income ÷
-edge.
+**1. The Shell economy has three faucets and one sink.** Tasks pay
+Shells in, plus the **capped lottery house match** (`decisions/0014`)
+and **capped visitor tips** (`decisions/0016`) — both promotional
+faucets bounded by per-player caps to roughly one daily task's worth
+each. The house edge takes Shells out. No cosmetic,
+collection state, or owned thing ever generates recurring Shells —
+completion rewards are one-time (`decisions/0005`) — and nothing but
+wagering consumes them. This keeps the identity the whole model rests
+on: lifetime handle ≈ (task income + subsidy) ÷ edge.
 
 **2. Pearls come only from wagering and leave only through cosmetics.**
 No task pays Pearls; no mechanism converts Pearls to Shells. The
@@ -36,7 +39,7 @@ more resentment than prestige.
 | Shell destruction ratio (edge × handle ÷ task faucet, weekly) | ≥ 0.90 |
 | Median Shell balance | Flat or gently rising — never compounding |
 | Median Pearl balance | Flat — a climbing balance means crate prices are too low |
-| Basic crates opened/week | ~47 committed · ~20 casual |
+| Basic crates opened/week | ~53 committed · ~19 casual |
 | Bust rate, typical stake sizing | ~0 — busting should be self-inflicted |
 | Share of players with "nothing left to chase" | < 5% |
 | Legendary pool size ÷ fastest player's Legendary count | > 1 at all times |
