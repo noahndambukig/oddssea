@@ -28,23 +28,24 @@ purpose: Index of every spec and its current state. Keep this current — it is 
 | `01-game/core-loop.md` | Draft |
 | `01-game/tasks.md` | Draft |
 | `01-game/game-modes.md` | **Not written** |
-| `02-economy/currency-model.md` | **Rewrite pending** — pre-revamp figures, see `decisions/0005` |
+| `02-economy/currency-model.md` | Agreed — simulated, not playtested |
 | `02-economy/dust.md` | Superseded (`decisions/0005`) |
-| `02-economy/guardrails.md` | Draft — needs revision for the wager economy |
+| `02-economy/guardrails.md` | Agreed — simulated, not playtested |
 | `03-cosmetics/*` | Agreed |
-| `03-cosmetics/content/gear-candidates.md` | **Awaiting selection** |
-| `03-cosmetics/content/skin-candidates.md` | **Awaiting selection** |
+| `03-cosmetics/content/gear-roster.md` | Agreed — 11 families chosen (`decisions/0013`) |
+| `03-cosmetics/content/gear-candidates.md` | Superseded — backlog |
+| `03-cosmetics/content/skin-roster.md` | Agreed — 11 families, cosmic is Void Weave |
+| `03-cosmetics/content/skin-candidates.md` | Superseded — backlog |
 | `03-cosmetics/content/set-list.md` | Draft — structural decision needed |
-| `04-technical/platform.md` | Agreed |
-| `04-technical/hosting.md` | Agreed |
+| `04-technical/platform.md` | Agreed — implementation begun (`web/`) |
+| `04-technical/hosting.md` | Agreed — implementation begun (`infra/`) |
 | `04-technical/data-model.md` | **Not written** |
 | `05-production/*` | Draft |
 | `06-risks/compliance.md` | Draft — **written before the genre was settled, needs revisiting** |
 
 ## Suggested order for what's next
 
-1. **Rewrite `02-economy/` for the two-currency wager model** — bankroll-ruin simulation first to derive the numbers, then `currency-model.md` and `guardrails.md`. The core loop (`01-game/core-loop.md`, draft) now defines the activities the numbers attach to. See roadmap question 6.
-2. **`01-game/game-modes.md`** — per-game rules, bet types and edge targets for the seven launch games (`decisions/0007`). Races need the most: odds generator, race simulation.
-3. **`06-risks/compliance.md`** — rewrite for a gambling simulator. Age rating, store category and whether Shells are ever purchasable all constrain the design, and they are cheaper to know now than after the economy is built.
-4. **`04-technical/data-model.md`** — the cosmetics and economy specs imply a schema (ledger, inventory, dex progress, tables). Write it down before code starts guessing.
-5. Lock the gear and skin rosters, then move the catalogue to JSON.
+1. **`01-game/game-modes.md`** — per-game rules, bet types and mechanics for the seven launch games (`decisions/0007`); edge targets are now set in `02-economy/currency-model.md`. Races need the most: odds generator, race simulation.
+2. **`06-risks/compliance.md`** — rewrite for a gambling simulator. Age rating, store category and whether Shells are ever purchasable all constrain the design, and they are cheaper to know now than after the economy is built.
+3. **`04-technical/data-model.md`** — the cosmetics and economy specs imply a schema (ledger, inventory, dex progress, tables). Write it down before code starts guessing.
+4. Lock the gear and skin rosters, then move the catalogue to JSON.

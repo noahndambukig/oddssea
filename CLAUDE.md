@@ -4,8 +4,9 @@ A social-casino / gambling-simulator game. Players earn a wagerable currency
 (Shells) through tasks, wagering earns the cosmetic currency (Pearls), and an
 avatar cosmetic collection system is the primary sink.
 
-**Specs live in `docs/`. History lives in `journal/`. Code lives in `src/`.**
-Specs lead; code follows.
+**Specs live in `docs/`. History lives in `journal/`. Code lives in the npm
+workspaces: `web/` (React client), `infra/` (AWS CDK), and later `api/`
+(Lambda handlers).** Specs lead; code follows.
 
 ## Read these first
 
@@ -128,11 +129,13 @@ requires a decision entry.
 | Area | Status |
 |---|---|
 | Cosmetic system | Agreed, simulated, not playtested |
-| Gear + skin rosters | Awaiting selection — `docs/03-cosmetics/content/` |
-| Economy | Revamped around wagering (`docs/decisions/0005`) — **numbers pending new simulations** |
+| Gear roster | Chosen — 11 families (`docs/decisions/0013`), `docs/03-cosmetics/content/gear-roster.md` |
+| Skin roster | Chosen — 11 families, cosmic is Void Weave — `docs/03-cosmetics/content/skin-roster.md` |
+| Economy | Agreed — wager economy simulated (`docs/decisions/0005`–`0011`), **not playtested** |
 | Launch game roster | Chosen — 7 games, `docs/decisions/0007` — **specs not yet written** |
 | Core game loop | Drafted — `docs/01-game/` (core-loop + tasks), awaiting review |
 | Platform + hosting | Agreed — web-first PWA on AWS, `docs/04-technical/` |
+| Deployment skeleton | Increment A built (`web/`, `infra/`, CI/CD) — **first deploy pending**; walkthrough in `infra/README.md` |
 | Data model | **Not yet specced** |
 | Compliance | Draft, written before the genre was settled — **needs revisiting** |
 
