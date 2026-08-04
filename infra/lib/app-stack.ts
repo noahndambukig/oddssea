@@ -1,10 +1,12 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as cdk from 'aws-cdk-lib';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import { Construct } from 'constructs';
 import { AppConfig } from './config';
 import { Web } from './constructs/web';
+import { Auth } from './constructs/auth';
 
 export interface AppStackProps extends cdk.StackProps {
   config: AppConfig;
@@ -14,8 +16,8 @@ const WEB_DIST = path.join(__dirname, '../../web/dist');
 
 /**
  * The application stack. Increment A: static hosting plus the deployment
- * that fills it. Cognito arrives in Increment B, the API in Increment C —
- * both as additions to this stack, not rewrites.
+ * that fills it. Increment B: Cognito auth on auth.oddssea.xyz. The API
+ * arrives in Increment C — an addition to this stack, not a rewrite.
  */
 export class AppStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: AppStackProps) {
@@ -32,6 +34,25 @@ export class AppStack extends cdk.Stack {
     }
 
     const web = new Web(this, 'Web', { config });
+
+    // Who the users are, and where they may be redirected. Takes the apex
+    // record because Cognito's custom-domain creation requires the parent
+    // to resolve — a prerequisite CloudFormation cannot see on its own.
+    const auth = new Auth(this, 'Auth', {
+      config,
+      appUrl: web.appUrl,
+      apexRecord: web.apexRecord,
+    });
+
+    // One shared, finite log group for the BucketDeployments' singleton
+    // helper Lambda. Deliberately NOT the logRetention prop: that legacy
+    // mechanism deploys a LogRetention custom-resource Lambda whose own
+    // logs retain forever — the retention-setter's logs would be
+    // unretained. An explicit group involves no helper at all.
+    const deployLogGroup = new logs.LogGroup(this, 'DeployLogs', {
+      retention: logs.RetentionDays.TWO_WEEKS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
 
     /**
      * Upload the built site — in two parts, deliberately.
@@ -59,6 +80,7 @@ export class AppStack extends cdk.Stack {
       cacheControl: [
         s3deploy.CacheControl.fromString('public, max-age=31536000, immutable'),
       ],
+      logGroup: deployLogGroup,
     });
 
     const rootDeployment = new s3deploy.BucketDeployment(this, 'DeployRoot', {
@@ -76,6 +98,11 @@ export class AppStack extends cdk.Stack {
         s3deploy.Source.jsonData('config.json', {
           environment: config.envName,
           region: this.region,
+          // Increment B: everything the browser needs to run the login
+          // flow — none of it known until CloudFormation creates it.
+          userPoolId: auth.userPool.userPoolId,
+          userPoolClientId: auth.userPoolClient.userPoolClientId,
+          cognitoDomain: auth.loginBaseUrl,
         }),
       ],
       prune: false,
@@ -84,11 +111,19 @@ export class AppStack extends cdk.Stack {
       // immediately, not after the cache TTL expires.
       distribution: web.distribution,
       distributionPaths: ['/index.html', '/config.json'],
+      logGroup: deployLogGroup,
     });
 
     // The ordering half of the atomicity story: assets first, then the HTML
     // that references them.
     rootDeployment.node.addDependency(assetsDeployment);
+
+    // Invisible-prerequisite race (c): the login URL in config.json is a
+    // computed string, not a CloudFormation reference, so nothing naturally
+    // orders the site upload after the auth infrastructure. The site
+    // publishes LAST — no Sign In button before the thing it points at
+    // exists.
+    rootDeployment.node.addDependency(auth.ready);
 
     // ---- Outputs -------------------------------------------------------
     // Printed after every `cdk deploy`; readable any time with:
@@ -101,6 +136,22 @@ export class AppStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'SiteBucket', { value: web.bucket.bucketName });
     new cdk.CfnOutput(this, 'DistributionId', {
       value: web.distribution.distributionId,
+    });
+    new cdk.CfnOutput(this, 'DistributionDomain', {
+      value: web.distribution.distributionDomainName,
+      description: 'The generated CloudFront hostname — should 302 to the canonical origin',
+    });
+    new cdk.CfnOutput(this, 'LoginBaseUrl', {
+      value: auth.loginBaseUrl,
+      description: 'Cognito hosted login pages',
+    });
+    new cdk.CfnOutput(this, 'UserPoolId', { value: auth.userPool.userPoolId });
+    new cdk.CfnOutput(this, 'UserPoolClientId', {
+      value: auth.userPoolClient.userPoolClientId,
+    });
+    new cdk.CfnOutput(this, 'IssuerUrl', {
+      value: auth.issuerUrl,
+      description: 'Append /.well-known/jwks.json to see the public signing keys',
     });
   }
 }

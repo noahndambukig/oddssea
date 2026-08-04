@@ -20,6 +20,7 @@
     "@aws-cdk/aws-s3:createDefaultLoggingPolicy": true,
     "@aws-cdk/aws-cloudfront:useOriginAccessControl": true,
     "@aws-cdk/core:enablePartitionLiterals": true,
+    "@aws-cdk/aws-route53-targets:userPoolDomainNameMethodWithoutCustomResource": true,
     "@aws-cdk/core:target-partitions": ["aws"]
   }
 }

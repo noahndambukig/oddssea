@@ -28,6 +28,14 @@ export class Web extends Construct {
   /** The origin the browser loads the app from, e.g. https://dev.oddssea.xyz */
   readonly appUrl: string;
 
+  /**
+   * The apex A record (oddssea.xyz → this distribution). Exposed because
+   * Cognito's custom auth domain requires the parent domain to resolve at
+   * creation time, and CloudFormation cannot see that prerequisite — the
+   * Auth construct takes this and declares the dependency explicitly.
+   */
+  readonly apexRecord?: route53.ARecord;
+
   constructor(scope: Construct, id: string, props: WebProps) {
     super(scope, id);
 
@@ -60,6 +68,9 @@ export class Web extends Construct {
 
       certificate = new acm.Certificate(this, 'Certificate', {
         domainName: hostname,
+        // The apex rides on the same certificate as a subject-alternative
+        // name, so the redirect below can serve oddssea.xyz over HTTPS.
+        subjectAlternativeNames: [config.domainName],
         // DNS validation: ACM asks for a specific CNAME record to be
         // published as proof of domain control. Because the zone is in this
         // account, CDK writes that record itself and the certificate
@@ -68,6 +79,48 @@ export class Web extends Construct {
         validation: acm.CertificateValidation.fromDns(hostedZone),
       });
     }
+
+    /**
+     * Canonical-origin redirect, evaluated at the edge on every request.
+     *
+     * The distribution answers on three names: dev.oddssea.xyz (canonical),
+     * oddssea.xyz (the apex), and its generated *.cloudfront.net hostname,
+     * which alternate domain names never disable. Serving the app on all
+     * three would break logins started anywhere but dev — OAuth callbacks
+     * are registered for the canonical origin only — so every other host
+     * bounces. The condition is "host ≠ canonical", not "host = apex", to
+     * cover the generated name and anything added later.
+     *
+     * 302, not 301, deliberately: the apex is promised to a future prod
+     * cutover, and browsers cache permanent redirects long enough to keep
+     * bypassing prod afterwards. Temporary status for a temporary
+     * arrangement.
+     */
+    const redirectFunction =
+      hostname !== undefined
+        ? new cloudfront.Function(this, 'CanonicalRedirect', {
+            runtime: cloudfront.FunctionRuntime.JS_2_0,
+            comment: `Redirect every non-canonical host to ${hostname}`,
+            code: cloudfront.FunctionCode.fromInline(`
+function handler(event) {
+  var request = event.request;
+  var host = request.headers.host.value;
+  if (host !== '${hostname}') {
+    var qs = '';
+    var keys = Object.keys(request.querystring);
+    for (var i = 0; i < keys.length; i++) {
+      qs += (qs ? '&' : '?') + keys[i] + '=' + request.querystring[keys[i]].value;
+    }
+    return {
+      statusCode: 302,
+      statusDescription: 'Found',
+      headers: { location: { value: 'https://${hostname}' + request.uri + qs } },
+    };
+  }
+  return request;
+}`),
+          })
+        : undefined;
 
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultRootObject: 'index.html',
@@ -79,8 +132,18 @@ export class Web extends Construct {
         // config.json revalidate. See app-stack.ts.
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         compress: true,
+        functionAssociations: redirectFunction
+          ? [
+              {
+                function: redirectFunction,
+                eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+              },
+            ]
+          : undefined,
       },
-      domainNames: hostname ? [hostname] : undefined,
+      // The apex is an alternate name so its requests reach the redirect
+      // function; the function then bounces them to the canonical host.
+      domainNames: hostname ? [hostname, config.domainName!] : undefined,
       certificate,
       // Cheapest tier: North America + Europe edges only.
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
@@ -103,6 +166,17 @@ export class Web extends Construct {
       new route53.ARecord(this, 'AliasRecord', {
         zone: hostedZone,
         recordName: config.subdomain,
+        target: route53.RecordTarget.fromAlias(
+          new targets.CloudFrontTarget(this.distribution),
+        ),
+      });
+
+      // The apex points at the same distribution; the edge function turns
+      // those visits into a 302 to the canonical host. This record is also
+      // what satisfies Cognito's parent-must-resolve check for
+      // auth.oddssea.xyz — see the apexRecord property doc above.
+      this.apexRecord = new route53.ARecord(this, 'ApexRecord', {
+        zone: hostedZone,
         target: route53.RecordTarget.fromAlias(
           new targets.CloudFrontTarget(this.distribution),
         ),

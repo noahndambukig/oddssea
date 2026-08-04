@@ -2,8 +2,8 @@
 
 This file is the guided tour of oddssea's infrastructure, written for someone
 deploying to AWS for the first time. It grows with the project: right now it
-covers **Increment A — a live URL**. Increments B (login) and C (the API) get
-appended when they land.
+covers **Increment A — a live URL** and **Increment B — login**. Increment C
+(the API) gets appended when it lands.
 
 The rule throughout: **nothing gets run before it is understood.** Every
 command says what it does, what it creates, and how to check it worked. When
@@ -386,6 +386,124 @@ continuous deployment.
 
 ---
 
+## Part 6 — Increment B: login
+
+### The shape of it
+
+```
+Sign in ──► https://auth.oddssea.xyz  (Cognito's hosted pages — AWS builds
+   ▲         the forms; you style them once in the branding designer)
+   │              │ user authenticates; Cognito redirects back with a CODE
+   │              ▼
+   │        /callback?code=…&state=…
+   │              │ web/src/auth/ swaps CODE + PKCE secret for tokens
+   │              ▼
+   │        first login only: the 18+ attestation gate
+   │              ▼
+   └── Sign out   sessionStorage: access (1h) · id (1h) · refresh (1 day)
+```
+
+Three new pieces of infrastructure, all in the same app stack: a **user
+pool** (the user directory — accounts, passwords, verification emails), an
+**app client** (this website's registration with the pool: no secret, code
+flow only, exact callback URLs), and the **custom auth domain**
+`auth.oddssea.xyz` — the same certificate + DNS pattern as the site, pointed
+at Cognito. The browser-side half is hand-written in
+[../web/src/auth/](../web/src/auth/) — read `pkce.ts` first; it explains the
+entire trick.
+
+The apex also changes: `oddssea.xyz` now resolves (Cognito requires the
+parent of a custom auth domain to exist) and 302-redirects to the canonical
+`dev.oddssea.xyz` — as does the distribution's generated `*.cloudfront.net`
+name. One origin, everywhere. 302 rather than 301 because the apex is
+promised to a future production cutover, and browsers cache permanent
+redirects long enough to outlive it.
+
+### Concepts before commands
+
+- **Authorization Code flow:** the site never sees your password. Cognito
+  verifies it and hands the browser a one-time *code* — a claim ticket —
+  exchanged for tokens in a separate request.
+- **PKCE:** the app invents a fresh secret per login, sends only its SHA-256
+  hash up front, and must present the original to cash the code. A stolen
+  code without the secret is worthless — this replaces the client secret a
+  browser cannot keep.
+- **`state`:** a random tag that must come back unchanged, so the app cannot
+  be tricked into completing a login *someone else* started.
+- **Three tokens:** ID = passport (who you are), access = boarding pass
+  (shown to APIs, 1h), refresh = re-issue rights (1 day —
+  `docs/decisions/0017`).
+- **JWTs are signed, not encrypted:** anyone can read one (the app has a
+  "show raw claims" button); nobody can forge one — the signature verifies
+  against Cognito's public keys.
+- **Logout is two things:** clearing the app's tokens AND ending Cognito's
+  own browser session — otherwise the next "sign in" sails through without
+  a password.
+- **The 18+ gate:** `docs/06-risks/compliance.md` requires attestation from
+  day one. It appears once, right after your first login, and writes a
+  timestamp to your Cognito user (`custom:age_attested_at`) that later
+  migrates to the players table.
+
+### Deploy it
+
+```bash
+npm run deploy
+```
+
+New in this run, in order: the ACM certificate for `auth.oddssea.xyz`
+validating (same DNS dance as Increment A); the apex joining the site
+certificate; and **the slow one** — the Cognito domain, which runs on a
+CloudFront distribution AWS manages and can take **15–60 minutes** to
+create. Not stuck. Go do the console safari below while it works.
+
+### Console safari
+
+- **Cognito → User pools → oddssea-dev:** note the *Essentials* feature plan
+  (what unlocks the brandable login pages). Under **App integration**, open
+  the app client and read the allowed callback URLs — this exact-string
+  list is why a stray trailing slash breaks login.
+- **Sign yourself up** at https://dev.oddssea.xyz → Create an account →
+  verification code arrives by email → confirm → the 18+ gate → you are in,
+  and the page shows your claims. Then find yourself: **Users** tab → your
+  email. `sub` is the immutable ID that will one day be the foreign key on
+  every ledger row; `custom:age_attested_at` is the gate's write.
+- **Watch the exchange happen** (the point of hand-writing it): devtools →
+  Network → sign out and in again. Find the redirect to
+  `/oauth2/authorize?…code_challenge=…` (the hash going out), the return to
+  `/callback?code=…&state=…`, and the POST to `/oauth2/token` (verifier in,
+  tokens out).
+- **Style the login page:** User pool → App integration → your client →
+  **Managed Login → branding designer**. Set the colors to the app palette —
+  background `#0a1420`, surface `#10202f`, accent `#3fb7c4`, text `#e6eef5` —
+  and upload the sailboat when an asset exists. This designer is the one
+  deliberate exception to everything-as-code: a visual tool for a visual
+  artefact. The stack only creates the default style once; CloudFormation
+  will not overwrite your design on later deploys.
+- **Prove the redirects:** visit `oddssea.xyz` and the `DistributionDomain`
+  output's `dxxxx.cloudfront.net` — both should land you on dev.
+
+### Running the app locally (`npm run dev`)
+
+There is no deployed `config.json` on localhost, so after the first deploy
+create `web/.env.local` from the stack outputs (gitignored — never
+committed):
+
+```
+VITE_REGION=us-east-1
+VITE_USER_POOL_ID=<UserPoolId output>
+VITE_USER_POOL_CLIENT_ID=<UserPoolClientId output>
+VITE_COGNITO_DOMAIN=<LoginBaseUrl output>
+```
+
+`http://localhost:5173/callback` is already a registered callback URL, so
+local login works against the real user pool. Three checks worth running
+here, all under React StrictMode (the dev default, which double-runs
+effects): a full login completes (the single-flight guard survives the
+double-run); a reload right after attesting does **not** reopen the gate
+(the forced token refresh landed the claim); and the session survives past
+the first hour (the refresh token was carried forward — the failure nothing
+else would catch).
+
 ## Failure modes worth recognising (Increment A)
 
 | Symptom | Cause | Fix |
@@ -400,6 +518,19 @@ continuous deployment.
 | Actions credentials step: `Credentials could not be loaded` | Workflow missing `id-token: write` | Already set in deploy.yml — check it wasn't edited out |
 | `No frontend build found at …/web/dist` | Synth/deploy ran without building web first | `npm run deploy` from the root (it builds first), or `npm run build` |
 | Page loads but stale after a deploy | CloudFront cache | The root deployment invalidates `/index.html` + `/config.json` — if you see this, check the deploy actually succeeded |
+
+## Failure modes worth recognising (Increment B)
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Deploy fails creating the auth domain: parent domain does not resolve | Cognito requires the apex to have a record before accepting a custom subdomain | The stack creates the apex record and declares the dependency — if it still fails, check the apex A record exists in the zone |
+| Auth domain sits `CREATE_IN_PROGRESS` for a very long time | Cognito provisions a managed CloudFront distribution behind it | Normal for 15–60 min on first create; not stuck |
+| A failed deploy rolled back, and the retry fails "domain already associated" | Cognito's custom-domain association can linger after rollback | Cognito console → the pool → App integration → confirm the domain is gone; wait for dissociation, then retry |
+| `redirect_mismatch` on the login page | The redirect_uri sent is not an exact-string match for a registered callback URL | Compare `web/src/auth/auth-client.ts` redirectUri() to the client's callback list — scheme, port and trailing slash all count |
+| Login page errors or renders unstyled ("branding style not found") | Managed Login requires a branding style per client | The stack creates one with defaults; redeploy if it was deleted, then restyle in the designer |
+| Tokens fail with `invalid_grant` at the token endpoint | The code was already spent (back button, double navigation), or the PKCE verifier is gone | Start a fresh login; the app consumes its verifier after one use by design |
+| Attestation write fails with "Access Token does not have required scopes" | The token was minted without `aws.cognito.signin.user.admin` | The authorize request must ask for it — check SCOPES in auth-client.ts; sign out and in to mint a fresh token |
+| The 18+ gate reappears after a reload | The stored ID token predates the attestation and lacks the claim | The gate forces a token refresh after writing; if it recurs, check forceRefresh ran and GetUser fallback is reachable |
 
 ---
 
@@ -430,6 +561,18 @@ Grows as terms first appear. Increment A's entries:
 | **OIDC provider** | IAM's registration of an external token issuer (GitHub) as trustworthy — the basis of keyless CI/CD. |
 | **`sub` condition** | The trust-policy line pinning role assumption to one repo+branch. The single most security-relevant line in the CI/CD stack. |
 | **STS** | Security Token Service — mints the temporary credentials behind every role assumption (`sts get-caller-identity` asks it "who am I?"). |
+| **Cognito / user pool** | AWS's user directory: accounts, passwords, verification, reset. Hosts the login pages so you don't build them. |
+| **App client** | A site's registration with the user pool: which flows, scopes and redirect URLs it may use. Ours is a *public client* — no secret. |
+| **Managed Login** | Cognito's brandable hosted login pages (requires the Essentials tier); styled once in the console's branding designer. |
+| **OAuth 2.0 / Authorization Code flow** | The redirect dance: authenticate elsewhere, return with a one-time code, exchange it for tokens out-of-band. |
+| **PKCE** | Per-login disposable secret: send the hash out, present the original to cash the code. Replaces the client secret a browser can't keep. |
+| **`state`** | Random tag echoed through the login round-trip; a mismatch means the redirect wasn't ours — refuse it (login-CSRF protection). |
+| **ID / access / refresh tokens** | Passport (who you are) / boarding pass (what you may call, 1h) / re-issue rights (1 day here). |
+| **JWT** | Signed-not-encrypted token format: header.payload.signature, each base64url. Readable by anyone, forgeable by no one. |
+| **Claims** | The key-value facts inside a token: `sub`, `email`, `exp`, `custom:age_attested_at`… `sub` is the immutable user ID — the future ledger foreign key. |
+| **Scopes** | What a token is allowed to do, granted at the authorize request. `aws.cognito.signin.user.admin` is what lets ours call the self-service user APIs. |
+| **JWKS** | Cognito's published public keys (`<issuer>/.well-known/jwks.json`) — how Increment C's API will verify signatures without calling Cognito. |
+| **L1 escape hatch** | Reaching under a CDK construct to set a raw CloudFormation property it doesn't expose yet (`node.defaultChild`) — how Managed Login is enabled here. |
 | **Root user** | The account-owner identity from signup. Unconstrained by policy, so: MFA it, then stop using it for daily work. |
 | **IAM Identity Center** | AWS's human-login system: browser sign-in, temporary CLI credentials that expire in hours. Replaces IAM users with permanent access keys. |
 | **Permission set** | Identity Center's template for what an assigned user may do in an account (here: AdministratorAccess). |

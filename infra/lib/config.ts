@@ -51,6 +51,21 @@ export interface AppConfig {
    */
   subdomain?: string;
 
+  /**
+   * Subdomain for Cognito's hosted login pages: "auth" produces
+   * auth.oddssea.xyz. Only used when domainName is set; without a custom
+   * domain the login pages live on the prefix domain below.
+   */
+  authSubdomain: string;
+
+  /**
+   * Fallback Hosted UI domain prefix, used only when domainName is unset:
+   * https://<prefix>.auth.<region>.amazoncognito.com. GLOBALLY unique
+   * across all AWS accounts — if deployment fails saying the domain
+   * already exists, change this.
+   */
+  cognitoDomainPrefix: string;
+
   /** GitHub repo allowed to deploy via CI/CD. */
   github: {
     owner: string;
@@ -91,6 +106,8 @@ export const configs: Record<string, AppConfig> = {
     // domain.
     domainName: 'oddssea.xyz',
     subdomain: 'dev',
+    authSubdomain: 'auth',
+    cognitoDomainPrefix: 'oddssea-dev',
 
     github: {
       owner: 'noahndambukig',
