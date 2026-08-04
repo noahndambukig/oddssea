@@ -1,32 +1,46 @@
 ---
-status: agreed
+status: agreed — simulated, not playtested
 purpose: Crate types, drop tables, pity rules and new-player guarantees.
 note: Prices live in 02-economy/currency-model.md, not here.
+depends-on: ../decisions/0009-pearl-to-item-pipeline.md, ../decisions/0010-crate-volume-and-premium-tier.md, ../decisions/0011-accountwide-pity-catalogue-expansion.md
 ---
 
 # Crates
 
-Two everyday crates plus a rotating event crate. Keeping gear and skins on separate crates doubles the number of "open a thing" moments and lets you price and pace the two axes independently.
+Gear and Skin crates each come in **basic and premium** quality tiers
+(`decisions/0010`), plus the set-targeted Set Crate. Keeping gear and
+skins on separate crates doubles the number of "open a thing" moments and
+lets the two axes be priced and paced independently. Crate opening is
+high-volume by design — a dedicated player opens ~50 basic crates a week
+— so opening is a quick, repeatable moment, not a ceremony, and **bulk
+salvage** is a required UI feature.
 
-## Gear Crate — 1 garment
-
-| Tier | Rate |
-|---|---|
-| Common | 58% |
-| Rare | 27% |
-| Epic | 11% |
-| Legendary | 4% |
-
-## Skin Crate — 1 skin
+## Basic crates — 1 garment (Gear) or 1 skin (Skin)
 
 | Tier | Rate |
 |---|---|
-| Common | 56% |
-| Rare | 28% |
-| Epic | 13% |
-| Legendary | 3% |
+| Common | 67% |
+| Rare | 25% |
+| Epic | 7% |
+| Legendary | 1% |
 
-Skins are priced above gear and drop Legendaries slightly less often, because the animated Legendary skin is the aspirational object in this system.
+The everyday open. Skins are priced above gear (see
+`02-economy/currency-model.md`) because the animated Legendary skin is
+the aspirational object in this system.
+
+## Premium crates — boosted odds, higher price
+
+| Tier | Rate |
+|---|---|
+| Common | 35% |
+| Rare | 40% |
+| Epic | 20% |
+| Legendary | 5% |
+
+Premium is the concentration play: fewer opens per Pearl, better opens.
+Priced so premium is only modestly more Legendary-efficient than basic —
+a real choice between volume (breadth, salvage fodder, dex progress) and
+chase quality, not a strictly dominant option.
 
 ## Set Crate — 1 piece from a target set
 
@@ -34,22 +48,48 @@ Skins are priced above gear and drop Legendaries slightly less often, because th
 |---|---|
 | Common | 40% |
 | Rare | 34% |
-| Epic | 20% |
-| Legendary | 6% |
+| Epic | 24% |
+| Legendary (keystone) | 2% |
 
-Only ever contains pieces from one target set, so it is a targeted purchase rather than a lottery. **How the target set is chosen is under revision** — v1 has no seasons and therefore no "currently active set" (`decisions/0008`); see `00-project/roadmap.md`, question 3.
+Only ever contains pieces from one target set. Targeting is **hybrid**
+(`decisions/0009`): the player chooses any set at standard price, and the
+weekly rotation features one set with a discount or bonus odds. Rotation
+details are `00-project/roadmap.md`, question 3.
 
-**The first four pulls from a given set are guaranteed to be distinct pieces.** Without this, duplicate luck dominates: plain random pulls need ~14.7 crates to complete a six-piece set and the tail is brutal. The distinct guarantee plus duplicate salvage brings it to ~10.4, which is what makes the timings in `02-economy/currency-model.md` work. Getting the same piece three times in your first three pulls is the fastest way to make a player abandon a set.
+**The first four pulls from a given set are guaranteed to be distinct
+pieces.** Without this, duplicate luck dominates the early chase, and
+getting the same piece three times in your first three pulls is the
+fastest way to make a player abandon a set.
 
-## Pity timers
+## Pity — disclosed in the UI, always
 
-Tracked **separately per crate type**, and disclosed to the player in the UI.
+- **Basic Legendary pity is account-wide across all basic crate opens**
+  (`decisions/0011`): a Legendary is guaranteed within 200 basic opens,
+  Gear and Skin combined, counter resetting on any basic Legendary.
+  At the 1% rate this fires for ~13% of chases — a felt mechanism, not a
+  sticker.
+- **Premium pity:** Legendary within 40 premium opens, account-wide
+  across premium crates.
+- **Set-chase pity:** the keystone is guaranteed within 100 Set Crates
+  opened against the same target set.
+- **Epic-or-better pity:** 10 consecutive basic opens without an Epic+
+  force one on the next open.
 
-- **Guaranteed Epic or better** if 10 consecutive opens produce none
-- **Guaranteed Legendary** if 50 consecutive opens produce none
-
-With a 4% base rate and 50-open hard pity, the *effective* Legendary rate is 4.6% and the worst case is bounded — which matters far more for retention than the average does. Verified in `02-economy/simulations/`.
+Every counter is visible to the player. Disclosed odds plus visible pity
+counters turn a black box into a system players can reason about, and
+reasoning about it is most of the fun.
 
 ## First-session guarantee
 
-A player's first three opens must produce **at least one garment and one skin that can be worn together**. Opening three skins with no gear to put them on is a miserable introduction, and it is the most common self-inflicted wound in slot-based cosmetics.
+A player's first three opens must produce **at least one garment and one
+skin that can be worn together**. Opening three skins with no gear to put
+them on is a miserable introduction, and it is the most common
+self-inflicted wound in slot-based cosmetics.
+
+## Verified outcomes
+
+Simulated in `02-economy/simulations/crate-game.py`; results of record in
+`02-economy/simulations/README.md`. Headlines: first Legendary at median
+1.3 weeks (dedicated) / 3.2 weeks (casual), set completion median 3 / 7
+weeks, ~31 / ~12 Legendaries per year — which is why catalogue expansion
+is an economy guardrail (`decisions/0011`).

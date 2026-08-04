@@ -1,34 +1,48 @@
 ---
-status: draft — needs revision for the wager economy
+status: agreed — simulated, not playtested
 purpose: The rules and metrics that stop the economy inflating.
-depends-on: ../decisions/0005-wagering-earns-the-cosmetic-currency.md
+depends-on: currency-model.md, ../decisions/0005-wagering-earns-the-cosmetic-currency.md, ../decisions/0011-accountwide-pity-catalogue-expansion.md
 ---
 
 # Anti-Inflation Guardrails
 
-> **Needs revision for `decisions/0005`.** The principles survive, but rule 1
-> and the metrics reference dust and the coin economy. Their revamp
-> equivalents: house edge is the Shell sink, so the destruction ratio becomes
-> edge × handle ÷ task faucet; the collection-rewards rule becomes "set
-> completion pays one-time, never per-day."
-
 ## Non-negotiable rules
 
-**1. No cosmetic ever generates coins.** Every productive reward in this system is paid in dust. This single rule eliminates the runaway-inflation failure mode entirely.
+**1. The Shell economy has one faucet and one sink.** Tasks pay Shells in;
+the house edge takes them out. No cosmetic, collection state, or owned
+thing ever generates recurring Shells — completion rewards are one-time
+(`decisions/0005`) — and nothing but wagering consumes them. This keeps
+the identity the whole model rests on: lifetime handle ≈ task income ÷
+edge.
 
-**2. Sink capacity must exceed the median player's lifetime earnings by at least 3×**, permanently. This is what seasonal content rotation is *for*.
+**2. Pearls come only from wagering and leave only through cosmetics.**
+No task pays Pearls; no mechanism converts Pearls to Shells. The
+marketplace trades in Pearls with a burn on every sale.
 
-**3. Retire sets into a vault, not oblivion.** Old sets rotate back periodically at a higher price. Original-season owners keep the status via a permanent season badge on the dex entry and an exclusive seasonal variant, so early adopters lose nothing — while a player who joined late is never permanently locked out of a set they love. Permanent exclusion generates far more resentment than it generates prestige.
+**3. The catalogue must grow at least as fast as the top-tier chase
+completes** (`decisions/0011`). Without seasons (`decisions/0008`),
+content cadence *is* the sink-capacity mechanism: the moment the fastest
+players own every Legendary, rule 1's sink keeps draining but desire
+stops. Cadence figure in `currency-model.md`.
+
+**4. Retired or vaulted items return.** When rotation eventually retires
+anything, it comes back at a premium later. Permanent exclusion generates
+more resentment than prestige.
 
 ## Metrics to instrument from day one
 
 | Metric | Target |
 |---|---|
-| Coins destroyed ÷ coins created (daily) | ≥ 0.95 |
-| Median player coin balance | Flat or gently rising — never compounding |
-| Share of players with "nothing left to buy" | < 5% |
-| Days to complete an active set | ~22 committed · ~47 casual |
-| Set cost as share of season earnings | ~39% committed · ~84% casual |
-| Median dust balance | Flat — a climbing balance means the 300/day cap is too loose |
+| Shell destruction ratio (edge × handle ÷ task faucet, weekly) | ≥ 0.90 |
+| Median Shell balance | Flat or gently rising — never compounding |
+| Median Pearl balance | Flat — a climbing balance means crate prices are too low |
+| Basic crates opened/week | ~47 committed · ~20 casual |
+| Bust rate, typical stake sizing | ~0 — busting should be self-inflicted |
+| Share of players with "nothing left to chase" | < 5% |
+| Legendary pool size ÷ fastest player's Legendary count | > 1 at all times |
 
-If the destruction ratio drops below 0.9 for a sustained period, prices are too low or faucets too generous. **Fix the faucet, not the prices** — visible price rises read as a betrayal, while a quietly retuned challenge payout does not.
+If the destruction ratio drifts below 0.85 sustained, the lever is the
+game-mix share of races (the fat-edge game) — via scheduling and
+promotion, not payout cuts. **Fix the faucet or the mix, never visible
+prices.** A quietly retuned challenge payout is invisible; a price rise
+reads as betrayal.
