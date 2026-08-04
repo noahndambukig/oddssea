@@ -13,13 +13,13 @@ purpose: Decisions that are blocking or will become blocking.
 
 ~~**10. Which three skin families are the launch sets?**~~ Resolved 2026-08-04: Tidepool, Bloomcycle and Chrome Dip, keystones in the shirt slot; Void Weave deliberately excluded — `03-cosmetics/content/skin-roster.md`.
 
-**3. Weekly rotation design.** What the rotating shop features each week, the featured-set discount or bonus-odds size, and the rotation cadence (`decisions/0009`). Blocks the shop and Set Crate specs.
+~~**3. Weekly rotation design.**~~ Resolved 2026-08-04: one family purchasable at the direct price plus one spotlight set at ~20% off — `decisions/0016`.
 
 ## Blocking economy tuning
 
 **4. What do seasons look like when they return post-v1?** Length, cadence, and how they interact with the permanent pool. Deferred by `decisions/0008`; sink capacity is covered meanwhile by catalogue expansion (`decisions/0011`).
 
-**5. Are Shells ever purchasable with real money?** Now the load-bearing compliance question: purchasable Shells feeding wagers and crates is real-money gambling adjacency — see `06-risks/compliance.md`.
+~~**5. Are Shells ever purchasable with real money?**~~ Resolved 2026-08-04 for v1: never — no real-money path in any direction; the wall is the whole compliance posture (`06-risks/compliance.md`). Revisiting post-v1 requires a decision entry and legal advice.
 
 ~~**6. The wager-economy numbers.**~~ Resolved 2026-08-03: derived by `02-economy/simulations/bankroll.py` and `crate-game.py`; `02-economy/` rewritten (decisions 0009–0011).
 
@@ -27,9 +27,9 @@ purpose: Decisions that are blocking or will become blocking.
 
 ## Blocking design of the flex layer
 
-**7. Can Mythics be traded?** Untradeable is cleaner; tradeable is dramatic.
+~~**7. Can Mythics be traded?**~~ Resolved 2026-08-04: yes, on the marketplace, with provenance, site-wide announcements and a suspension lever — taken against the compliance lean, `decisions/0016`.
 
-**8. What do visitor tips pay now that dust is removed?** Tipping Shells feeds bankrolls from social approval; tipping Pearls breaks their wager-exclusivity; removing tips weakens the Closet loop. See `03-cosmetics/flex-layer.md`.
+~~**8. What do visitor tips pay now that dust is removed?**~~ Resolved 2026-08-04: capped Shells, the economy's third faucet — `decisions/0016`.
 
 ~~**9. React or Svelte?**~~ Resolved 2026-08-03: React —
 `decisions/0012-react-for-the-client.md`.

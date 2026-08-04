@@ -131,13 +131,14 @@ requires a decision entry.
 | Cosmetic system | Agreed, simulated, not playtested |
 | Gear roster | Chosen — 11 families (`docs/decisions/0013`), `docs/03-cosmetics/content/gear-roster.md` |
 | Skin roster | Chosen — 11 families, cosmic is Void Weave — `docs/03-cosmetics/content/skin-roster.md` |
+| Content data | Shipped — `docs/03-cosmetics/content/data/*.json`, version 1.0.0; racers in `docs/01-game/racers.md` |
 | Economy | Agreed — wager economy simulated (`docs/decisions/0005`–`0011`), **not playtested** |
 | Launch game roster | Chosen — 7 games (`docs/decisions/0007`) — specs drafted, `docs/01-game/game-modes.md` |
 | Core game loop | Drafted — `docs/01-game/` (core-loop + tasks), awaiting review |
 | Platform + hosting | Agreed — web-first PWA on AWS, `docs/04-technical/` |
 | Deployment skeleton | Increment A built (`web/`, `infra/`, CI/CD) — **first deploy pending**; walkthrough in `infra/README.md` |
-| Data model | **Not yet specced** |
-| Compliance | Draft, written before the genre was settled — **needs revisiting** |
+| Data model | Drafted — `docs/04-technical/data-model.md` (`decisions/0015`), awaiting review |
+| Compliance | Agreed — no-real-money wall, v1 posture (`docs/06-risks/compliance.md`) |
 
 ## Context worth knowing
 
