@@ -28,7 +28,7 @@ Two everyday crates plus a rotating event crate. Keeping gear and skins on separ
 
 Skins are priced above gear and drop Legendaries slightly less often, because the animated Legendary skin is the aspirational object in this system.
 
-## Set Crate — 1 piece from the active seasonal set
+## Set Crate — 1 piece from a target set
 
 | Tier | Rate |
 |---|---|
@@ -37,7 +37,7 @@ Skins are priced above gear and drop Legendaries slightly less often, because th
 | Epic | 20% |
 | Legendary | 6% |
 
-Only ever contains pieces from the currently active set, so it is a targeted purchase rather than a lottery.
+Only ever contains pieces from one target set, so it is a targeted purchase rather than a lottery. **How the target set is chosen is under revision** — v1 has no seasons and therefore no "currently active set" (`decisions/0008`); see `00-project/roadmap.md`, question 3.
 
 **The first four pulls from a given set are guaranteed to be distinct pieces.** Without this, duplicate luck dominates: plain random pulls need ~14.7 crates to complete a six-piece set and the tail is brutal. The distinct guarantee plus duplicate salvage brings it to ~10.4, which is what makes the timings in `02-economy/currency-model.md` work. Getting the same piece three times in your first three pulls is the fastest way to make a player abandon a set.
 

@@ -11,11 +11,11 @@ purpose: Decisions that are blocking or will become blocking.
 
 **2. Skin roster, and which cosmic Legendary.** See `03-cosmetics/content/skin-candidates.md`. Blocks the shader work.
 
-**3. Permanent pool vs seasonal sets.** Are launch skin families uniform-tier, with seasonal sets as a separate mixed-tier construct? See `03-cosmetics/content/set-list.md`. Blocks the Set Crate implementation.
+**3. What does the Set Crate target now that v1 has no seasons?** Launch sets are a permanent pool (`decisions/0008`) but the crate spec assumed a "currently active set." Player-chosen target vs rotating spotlight. See `03-cosmetics/content/set-list.md`. Blocks the Set Crate implementation.
 
 ## Blocking economy tuning
 
-**4. Season length.** Everything in `02-economy/` assumes 8 weeks.
+**4. What do seasons look like when they return post-v1?** Length, rotation cadence, and what covers guardrails' sink-capacity rule until then. Deferred by `decisions/0008`.
 
 **5. Are Shells ever purchasable with real money?** Now the load-bearing compliance question: purchasable Shells feeding wagers and crates is real-money gambling adjacency — see `06-risks/compliance.md`.
 

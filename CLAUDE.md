@@ -74,6 +74,26 @@ Put these last in the response, after everything else. One or two per response
 at most — if there are more, the threshold for "significant" is being applied
 too loosely.
 
+## Teach as you build
+
+This project is also how I learn. Every response that makes a change — code,
+spec, simulation, config — ends with a short **Learning** section: a paragraph
+explaining what was just done and, more importantly, the underlying concepts
+behind it. Ground it in the general idea (the pattern, the algorithm, the
+trade-off, the language/tool feature), not just a restatement of the diff. The
+test: after reading it, I should be able to explain *why* it was done this way
+to someone else, and recognise the concept next time it appears.
+
+- One paragraph per change or coherent group of changes; brief, not a tutorial.
+- Name the concepts explicitly so I can look them up (e.g. "this is memoisation",
+  "this is a foreign-key constraint", "this is regression to the mean in the
+  crate simulation").
+- If a change involved a choice between approaches, say what the alternative
+  was and why it lost.
+- Trivial mechanical edits (typo fixes, renames) don't need one.
+- This is separate from the journal. The Learning section teaches me; the
+  journal records project history. The `Journal —` line still goes last.
+
 ## Working rules
 
 **Numbers have exactly one home.** Every coin, price and rate lives in
@@ -111,7 +131,7 @@ requires a decision entry.
 | Gear + skin rosters | Awaiting selection — `docs/03-cosmetics/content/` |
 | Economy | Revamped around wagering (`docs/decisions/0005`) — **numbers pending new simulations** |
 | Launch game roster | Chosen — 7 games, `docs/decisions/0007` — **specs not yet written** |
-| Core game loop | **Not yet specced** |
+| Core game loop | Drafted — `docs/01-game/` (core-loop + tasks), awaiting review |
 | Platform + hosting | Agreed — web-first PWA on AWS, `docs/04-technical/` |
 | Data model | **Not yet specced** |
 | Compliance | Draft, written before the genre was settled — **needs revisiting** |

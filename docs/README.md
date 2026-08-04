@@ -25,7 +25,8 @@ purpose: Index of every spec and its current state. Keep this current — it is 
 | `00-project/doc-conventions.md` | Agreed |
 | `00-project/spec-workflow.md` | Agreed |
 | `00-project/glossary.md` | Agreed |
-| `01-game/core-loop.md` | **Not written** |
+| `01-game/core-loop.md` | Draft |
+| `01-game/tasks.md` | Draft |
 | `01-game/game-modes.md` | **Not written** |
 | `02-economy/currency-model.md` | **Rewrite pending** — pre-revamp figures, see `decisions/0005` |
 | `02-economy/dust.md` | Superseded (`decisions/0005`) |
@@ -42,8 +43,8 @@ purpose: Index of every spec and its current state. Keep this current — it is 
 
 ## Suggested order for what's next
 
-1. **`01-game/core-loop.md`** — everything else assumes it and nothing has specced it. The revamp makes wagering the core activity (`decisions/0005`), but what players wager *on* — modes, events, where the odds come from — is unspecced.
-2. **Rewrite `02-economy/` for the two-currency wager model** — bankroll-ruin simulation first to derive the numbers, then `currency-model.md` and `guardrails.md`. See roadmap question 6.
+1. **Rewrite `02-economy/` for the two-currency wager model** — bankroll-ruin simulation first to derive the numbers, then `currency-model.md` and `guardrails.md`. The core loop (`01-game/core-loop.md`, draft) now defines the activities the numbers attach to. See roadmap question 6.
+2. **`01-game/game-modes.md`** — per-game rules, bet types and edge targets for the seven launch games (`decisions/0007`). Races need the most: odds generator, race simulation.
 3. **`06-risks/compliance.md`** — rewrite for a gambling simulator. Age rating, store category and whether Shells are ever purchasable all constrain the design, and they are cheaper to know now than after the economy is built.
-4. **`04-technical/data-model.md`** — the cosmetics spec implies a schema (items, skins, ownership, provenance, dex progress). Write it down before code starts guessing.
+4. **`04-technical/data-model.md`** — the cosmetics and economy specs imply a schema (ledger, inventory, dex progress, tables). Write it down before code starts guessing.
 5. Lock the gear and skin rosters, then move the catalogue to JSON.
