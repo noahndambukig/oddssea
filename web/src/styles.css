@@ -1,0 +1,94 @@
+/*
+ * Deliberately minimal — this is a pipeline proof, not the game UI.
+ *
+ * Two rules from docs/04-technical/platform.md apply from the first line of
+ * CSS regardless: designed at phone width first, and interactive targets
+ * never below 44px (none exist yet, but the rule is recorded where it will
+ * be seen).
+ */
+
+:root {
+  --bg: #0a1420;
+  --surface: #10202f;
+  --border: #1e3548;
+  --text: #e6eef5;
+  --muted: #8aa4b8;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+
+/* Phone-first: full width with safe-area padding for notched devices. */
+.shell {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 3rem max(1.25rem, env(safe-area-inset-left)) 4rem;
+}
+
+h1 {
+  font-size: 2rem;
+  margin: 0 0 0.25rem;
+  letter-spacing: -0.02em;
+}
+
+.muted {
+  color: var(--muted);
+  margin: 0 0 2rem;
+  font-size: 0.95rem;
+}
+
+.facts {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.125rem 1rem;
+}
+
+.facts dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.facts dd {
+  margin: 0 0 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.facts dd:last-child {
+  margin-bottom: 0;
+}
+
+@media (min-width: 30rem) {
+  .facts {
+    grid-template-columns: max-content 1fr;
+  }
+  .facts dt {
+    font-size: 0.9rem;
+  }
+}

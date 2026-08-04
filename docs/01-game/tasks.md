@@ -36,7 +36,7 @@ Plus **three challenges drawn daily** from a rotating pool:
 
 | Task | Size | Notes |
 |---|---|---|
-| Complete daily sets on 5 different days | L | The consistency reward — the casual backbone |
+| Complete daily sets on 4 different days | L | The consistency reward — reachable by a 4-active-day casual, which is the point |
 | Place N bets across M different games | M | Roster-wide volume |
 | Attend N races over the week | M | Appointment-beat reinforcement |
 | Complete any 3 weeklies | — | Pays a **free ticket to the weekly lottery draw**, not Shells |

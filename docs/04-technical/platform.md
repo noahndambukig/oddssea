@@ -2,6 +2,7 @@
 status: agreed
 purpose: What the game runs on and how players reach it.
 depends-on: ../decisions/0006-web-first-on-a-web-native-stack.md
+implemented-by: ../../web/
 ---
 
 # Platform
@@ -22,12 +23,14 @@ sidebar on desktop; wager slips are bottom sheets on mobile, side panels on
 desktop.
 
 **The PWA layer** makes it feel like an app: a web manifest (`display:
-standalone`, home-screen icon) and a service worker caching the app shell
+standalone`, home-screen icon — the sailboat, see
+`../00-project/identity.md`) and a service worker caching the app shell
 and cosmetic assets so second launch is instant.
 
-**Client stack:** TypeScript throughout. A component framework (React or
-Svelte — see open questions) renders the UI screens, which is most of the
-game. **PixiJS** renders the WebGL surfaces: the avatar view, the Closet,
+**Client stack:** TypeScript throughout. **React** renders the UI screens,
+which is most of the game — chosen for ecosystem depth and the maintained
+`@pixi/react` integration; see `decisions/0012-react-for-the-client.md`.
+**PixiJS** renders the WebGL surfaces: the avatar view, the Closet,
 and crate-opening moments. The animation ladder's one-shader design maps
 directly to Pixi fragment shaders.
 
@@ -62,8 +65,8 @@ step waits for the compliance pass.
 
 ## Open questions
 
-- **React or Svelte** for the UI framework. Blocks nothing until code
-  starts. Rolled up into `00-project/roadmap.md`.
+None currently. (React vs Svelte was resolved by
+`decisions/0012-react-for-the-client.md` when code started.)
 
 ## Numbers
 

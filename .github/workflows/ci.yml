@@ -1,0 +1,36 @@
+name: CI
+
+# Runs on every pull request and on pushes to any branch except main. No AWS
+# credentials are involved: it proves the code compiles and the infrastructure
+# definition synthesises to valid CloudFormation. Nothing here can touch AWS.
+on:
+  push:
+    branches-ignore: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build frontend
+        run: npm run build
+
+      # `cdk synth` turns infra/'s TypeScript into CloudFormation templates.
+      # Passing means the infrastructure is structurally valid — which
+      # catches most mistakes long before a deploy would.
+      - name: Synthesise CloudFormation
+        run: npm run synth --workspace infra

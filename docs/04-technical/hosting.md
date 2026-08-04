@@ -2,6 +2,7 @@
 status: agreed
 purpose: The AWS architecture serving the game.
 depends-on: ../decisions/0006-web-first-on-a-web-native-stack.md
+implemented-by: ../../infra/
 ---
 
 # Hosting

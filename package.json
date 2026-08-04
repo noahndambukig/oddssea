@@ -1,0 +1,22 @@
+{
+  "name": "oddssea",
+  "version": "0.0.0",
+  "private": true,
+  "description": "oddssea — social-casino / gambling simulator. Specs in docs/, history in journal/.",
+  "workspaces": [
+    "web",
+    "infra"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "npm run build --workspace web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "synth": "npm run build && npm run synth --workspace infra",
+    "diff": "npm run build && npm run diff --workspace infra",
+    "deploy": "npm run build && npm run deploy --workspace infra",
+    "deploy:cicd": "npm run deploy:cicd --workspace infra",
+    "dev": "npm run dev --workspace web"
+  }
+}

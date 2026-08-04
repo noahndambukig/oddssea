@@ -1,71 +1,124 @@
 ---
-status: draft — pre-revamp figures, rewrite pending
+status: agreed — simulated, not playtested
 purpose: Single source of truth for every currency figure in the system.
-depends-on: ../decisions/0005-wagering-earns-the-cosmetic-currency.md
+depends-on: ../decisions/0005-wagering-earns-the-cosmetic-currency.md, ../decisions/0009-pearl-to-item-pipeline.md, ../decisions/0010-crate-volume-and-premium-tier.md, ../decisions/0011-accountwide-pity-catalogue-expansion.md
 ---
 
 # Currency Model
 
-> **The two-currency wager revamp (`decisions/0005`) replaces this model.**
-> The currencies are now Shells (task-earned, wagerable) and Pearls
-> (wager-earned, buys cosmetics). The figures below describe the pre-revamp
-> coin economy and are retained only until the Shell/Pearl numbers are
-> derived — that requires the bankroll-ruin simulation first. Do not build
-> against anything below this line.
+**Every currency number in the project lives in this file.** Other
+documents link here rather than restating figures. See
+`00-project/doc-conventions.md`, rule 2. Figures were derived by
+`simulations/bankroll.py` and `simulations/crate-game.py`; re-run both
+before changing anything here.
 
-**Every currency number in the project lives in this file.** Other documents link here rather than restating figures. See `00-project/doc-conventions.md`, rule 2.
+Two currencies (`decisions/0005`): **Shells** — task-earned, wagerable —
+and **Pearls** — earned only by wagering, spent on cosmetics.
 
-## Faucets — coins in
+## Shells in — the task faucet
 
-| Source | Amount |
+Task structure lives in `01-game/tasks.md`; the payouts live here.
+
+| Task | Shells |
 |---|---|
-| Per match | 15–40 (avg ~25), scaled by performance |
-| Daily first win | 100 |
-| Daily challenge | 75 |
-| Weekly challenge | 400 |
-| Season pass milestones | ~1,500 per season |
+| Daily login | 50, +10 per consecutive day, capped at 100 (day 6) |
+| First bet of the day | 25 |
+| Daily challenge (3 offered per day) | 75 each |
+| Weekly: complete daily sets on 4 different days | 500 |
+| Weekly: volume across games | 300 |
+| Weekly: race attendance | 300 |
+| Onboarding tour (one-time) | 5 steps × 80 = 400 total |
+| First bet in each game (one-time) | 50 each |
+| Feature firsts (one-time) | 50 each |
+| Dex page completed (one-time) | 200 |
+| Set completed (one-time, `decisions/0005`) | 1,500 |
+| Referral — referrer, on referee earning 300 | 2,000 |
+| Referral — referee starter boost | 250 |
+
+The referral threshold (300) sits below the onboarding chain total (400)
+by design — see `01-game/tasks.md`.
 
 ### Reference earn rates
 
-| Player | Composition | Coins |
+| Player | Pattern | Shells |
 |---|---|---|
-| **Committed** (10 matches/day, 7 days) | 250 match + 100 first win + 75 daily | **425/day · 2,975/week · 23,800/season** |
-| **Casual** (3 matches/day, 4 days) | 75 match + 100 first win + 75 daily, plus 400 weekly | **~200/day · 1,400/week · 11,200/season** |
+| **Committed** | 7 days, full streak, all dailies + weeklies | ~500/day · **~3,550/week** |
+| **Casual** | 4 days, 2 of 3 dailies, consistency weekly | ~350/day · **~1,400/week** |
 
-Roughly **70% of the casual player's income comes from dailies and weeklies rather than match volume.** This is deliberate and worth protecting: it means a low-volume player earns at a third of a committed player's rate rather than a tenth, which is the only reason seasonal sets are reachable for them at all.
+## Shells out — wagering
 
-Season length is assumed to be 8 weeks throughout.
+The **house edge is the only Shell sink**. Minimum bet **10 Shells** —
+one casual day funds 35 minimum bets, the comeback floor.
 
-## Sinks — coins out
-
-| Sink | Cost | Type |
+| Game | Edge | Representative odds |
 |---|---|---|
-| Gear Crate | 500 | Primary |
-| Skin Crate | 800 | Primary |
-| Set Crate | 900 | Seasonal, targeted |
-| Fusion: 4 Common → 1 Rare | 200 + items | Pure burn |
-| Fusion: 4 Rare → 1 Epic | 500 + items | Pure burn |
-| Fusion: 4 Epic → 1 Legendary | 1,500 + items | Pure burn |
-| Fusion: 4 Legendary → chosen Legendary | 5,000 + items | Pure burn |
-| Closet expansion | 2,000 | One-off |
-| Extra loadout slot | 1,500 | One-off |
-| Showcase pedestal | 3,000 | One-off |
-| Marketplace listing fee | 50 | Pure burn |
-| Marketplace sale tax | 10% of sale | Pure burn |
+| Sea races | 10% (overround) | ~5.0 |
+| Instant (crash, plinko, dice) | 3% | ~2.0 |
+| Roulette | 2.7% | ~2.0 |
+| Blackjack | 1.5% effective | ~2.0 |
 
-## Set completion timings
+At the reference mix (40% races, 30% instant, 20% roulette, 10%
+blackjack) the blended edge is ~5.6%. Reference handle: **~58,000/week
+committed, ~25,000/week casual**.
 
-With the Set Crate at 900 and the first-four-distinct guarantee, completing a six-piece set costs ~10.4 crates ≈ **9,400 coins**.
+## Pearls in — the wager reward
 
-| Player | Days to complete a set | Share of season earnings |
+Per bet: **0.75 × stake × edge**, plus on a win **0.30 × stake × edge ×
+odds**. Expected total ≈ 1.05 Pearls per Shell of theoretical loss,
+identical across games (farm-proof); long-odds wins pay visibly more.
+
+Reference Pearl income: **~3,300/week committed, ~1,400/week casual**.
+
+## Pearls out — crates, shop and sinks
+
+| Sink | Pearls | Notes |
 |---|---|---|
-| Committed | ~22 | ~39% |
-| Casual | ~47 | ~84% |
+| Basic Gear Crate | 60 | Legendary 1% |
+| Basic Skin Crate | 80 | skins priced above gear deliberately |
+| Premium Gear Crate | 240 | Legendary 5%, Epic 20% |
+| Premium Skin Crate | 320 | |
+| Set Crate | 90 | keystone 2%; hybrid targeting (`decisions/0009`) |
+| Direct purchase (featured in weekly rotation) | 1.5× expected crate-route cost | e.g. Legendary ≈ 9,500 |
+| Fusion 4 Common → Rare | 50 + items | |
+| Fusion 4 Rare → Epic | 150 + items | |
+| Fusion 4 Epic → Legendary | 500 + items | |
+| Fusion 4 Legendary → chosen Legendary | 1,500 + items | |
+| Closet expansion | 800 | one-off |
+| Extra loadout slot | 500 | one-off |
+| Showcase pedestal | 1,200 | one-off |
+| Marketplace listing | 20 | pure burn |
+| Marketplace sale tax | 10% | pure burn |
 
-Both fit inside an 8-week season. Simulation in `simulations/`.
+Salvage (duplicates → Pearls): Common 4 · Rare 12 · Epic 45 · Legendary
+180.
 
-## The tension to watch
+Pity: **Legendary guaranteed within 200 basic crate opens, account-wide**
+(`decisions/0011`); premium within 40; set-chase keystone within 100 Set
+Crates per chase. Drop tables live in `03-cosmetics/crates.md`.
 
-A casual player spending 84% of a season's income on a single set has almost nothing left for gear crates, and experiences the system as *one long grind toward one thing*. Survivable, but fragile.
+## What the simulations show
 
-If retention data shows casual players stalling mid-set, **the lever is the weekly challenge payout** — 400 → 600 takes them to ~1,600/week and the set to ~41 days. Raising the faucet for low-volume players is far less inflationary than cutting prices for everyone, and a visible price cut reads as an admission that the original price was a rip-off.
+| Outcome | Committed | Casual |
+|---|---|---|
+| Basic crates/week | ~47 | ~20 |
+| First Legendary (median / p90) | 1.3 / 3.8 wk | 3.2 / 9.5 wk |
+| Pity fires | ~13% of chases | ~13% |
+| Legendaries/year | ~31 | ~12 |
+| Set completion (median / p90) | 3 / 9 wk | 7 / 21 wk |
+| Busts/week (typical stake sizing) | 0 | 0 |
+| Shell destruction ratio | ~0.90 | ~0.96 |
+
+## The tensions to watch
+
+**The committed destruction ratio is 0.90**, so a committed player's
+balance drifts up ~350 Shells/week. Mild, but if playtests show hoarding,
+the lever is the race share of the game mix (races carry the fat edge) —
+not task payouts, and never visible price rises.
+
+**The casual set-chase p90 is 21 weeks.** The rotation buyout is what caps
+the tail; if playtests show casuals stalling at 5/6, tighten the rotation
+interval before touching drop rates.
+
+**Catalogue expansion is an economy input** (`decisions/0011`): ~31
+Legendaries/year for committed players means the Legendary pool must grow
+by roughly one item per month or the top of the catalogue runs dry.
