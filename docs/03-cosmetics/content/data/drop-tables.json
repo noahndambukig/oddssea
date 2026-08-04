@@ -1,0 +1,20 @@
+{
+  "content_version": "1.0.0",
+  "_note": "Docs of record: 03-cosmetics/crates.md (rates, pity) and 02-economy/currency-model.md (prices). This file is the shipping copy the game loads; regenerate docs from it once doc-generation exists (doc-conventions rule 6).",
+  "crates": {
+    "basic_gear": { "price_pearls": 70, "rates": { "common": 0.67, "rare": 0.25, "epic": 0.07, "legendary": 0.01 } },
+    "basic_skin": { "price_pearls": 90, "rates": { "common": 0.67, "rare": 0.25, "epic": 0.07, "legendary": 0.01 } },
+    "premium_gear": { "price_pearls": 280, "rates": { "common": 0.35, "rare": 0.40, "epic": 0.20, "legendary": 0.05 } },
+    "premium_skin": { "price_pearls": 360, "rates": { "common": 0.35, "rare": 0.40, "epic": 0.20, "legendary": 0.05 } },
+    "set": { "price_pearls": 100, "rates": { "common": 0.40, "rare": 0.34, "epic": 0.24, "legendary": 0.02 },
+      "first_four_distinct": true }
+  },
+  "pity": {
+    "basic_legendary": { "scope": "account_basic_all", "threshold": 200 },
+    "premium_legendary": { "scope": "account_premium_all", "threshold": 40 },
+    "set_keystone": { "scope": "per_set_chase", "threshold": 100 },
+    "epic_or_better": { "scope": "account_basic_all", "threshold": 10 }
+  },
+  "salvage_pearls": { "common": 4, "rare": 12, "epic": 45, "legendary": 180 },
+  "direct_price_multiplier": 1.5
+}

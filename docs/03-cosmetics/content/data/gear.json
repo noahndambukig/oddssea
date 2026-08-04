@@ -1,0 +1,127 @@
+{
+  "content_version": "1.0.0",
+  "_note": "Shipping format per doc-conventions rule 6 and decisions/0013, 0015. Human roster of record: ../gear-roster.md. Slots per ../../slots.md.",
+  "families": [
+    {
+      "id": "basics", "name": "Basics", "tier": "common",
+      "items": {
+        "headgear": { "id": "gear.basics.headgear", "name": "Forward Cap" },
+        "shirt": { "id": "gear.basics.shirt", "name": "Tee" },
+        "pants": { "id": "gear.basics.pants", "name": "Jeans" },
+        "shoes": { "id": "gear.basics.shoes", "name": "Runners" },
+        "backpack": { "id": "gear.basics.backpack", "name": "Daypack" },
+        "held": { "id": "gear.basics.held", "name": "Umbrella" }
+      }
+    },
+    {
+      "id": "athletics", "name": "Athletics", "tier": "common",
+      "items": {
+        "headgear": { "id": "gear.athletics.headgear", "name": "Visor" },
+        "shirt": { "id": "gear.athletics.shirt", "name": "Tank" },
+        "pants": { "id": "gear.athletics.pants", "name": "Joggers" },
+        "shoes": { "id": "gear.athletics.shoes", "name": "Trail Shoes" },
+        "backpack": { "id": "gear.athletics.backpack", "name": "Sling Bag" },
+        "held": { "id": "gear.athletics.held", "name": "Water Bottle" }
+      }
+    },
+    {
+      "id": "skater", "name": "Skater", "tier": "common",
+      "items": {
+        "headgear": { "id": "gear.skater.headgear", "name": "Backwards Snapback" },
+        "shirt": { "id": "gear.skater.shirt", "name": "Oversized Tee" },
+        "pants": { "id": "gear.skater.pants", "name": "Baggy Cargo Shorts" },
+        "shoes": { "id": "gear.skater.shoes", "name": "Canvas Low-tops" },
+        "backpack": { "id": "gear.skater.backpack", "name": "Drawstring Sack" },
+        "held": { "id": "gear.skater.held", "name": "Skateboard" }
+      }
+    },
+    {
+      "id": "picnic", "name": "Picnic", "tier": "common",
+      "items": {
+        "headgear": { "id": "gear.picnic.headgear", "name": "Wide Sun Hat" },
+        "shirt": { "id": "gear.picnic.shirt", "name": "Camp-collar Shirt" },
+        "pants": { "id": "gear.picnic.pants", "name": "Shorts" },
+        "shoes": { "id": "gear.picnic.shoes", "name": "Sandals" },
+        "backpack": { "id": "gear.picnic.backpack", "name": "Basket Bag" },
+        "held": { "id": "gear.picnic.held", "name": "Thermos" }
+      }
+    },
+    {
+      "id": "cozy", "name": "Cozy", "tier": "common",
+      "items": {
+        "headgear": { "id": "gear.cozy.headgear", "name": "Soft Beanie" },
+        "shirt": { "id": "gear.cozy.shirt", "name": "Long-sleeve" },
+        "pants": { "id": "gear.cozy.pants", "name": "Pyjama Pants" },
+        "shoes": { "id": "gear.cozy.shoes", "name": "Slip-ons" },
+        "backpack": { "id": "gear.cozy.backpack", "name": "Tote" },
+        "held": { "id": "gear.cozy.held", "name": "Coffee Cup" }
+      }
+    },
+    {
+      "id": "streetwear", "name": "Streetwear", "tier": "rare",
+      "items": {
+        "headgear": { "id": "gear.streetwear.headgear", "name": "Over-ear Headphones" },
+        "shirt": { "id": "gear.streetwear.shirt", "name": "Hoodie" },
+        "pants": { "id": "gear.streetwear.pants", "name": "Cargo Pants" },
+        "shoes": { "id": "gear.streetwear.shoes", "name": "High-tops" },
+        "backpack": { "id": "gear.streetwear.backpack", "name": "Roll-top Pack" },
+        "held": { "id": "gear.streetwear.held", "name": "Boombox" }
+      }
+    },
+    {
+      "id": "aviator", "name": "Aviator", "tier": "rare",
+      "items": {
+        "headgear": { "id": "gear.aviator.headgear", "name": "Aviator Goggles" },
+        "shirt": { "id": "gear.aviator.shirt", "name": "Bomber Jacket" },
+        "pants": { "id": "gear.aviator.pants", "name": "Flight Trousers" },
+        "shoes": { "id": "gear.aviator.shoes", "name": "Lace-up Boots" },
+        "backpack": { "id": "gear.aviator.backpack", "name": "Hardshell Case" },
+        "held": { "id": "gear.aviator.held", "name": "Camera" }
+      }
+    },
+    {
+      "id": "winter", "name": "Winter", "tier": "rare",
+      "items": {
+        "headgear": { "id": "gear.winter.headgear", "name": "Earmuffs" },
+        "shirt": { "id": "gear.winter.shirt", "name": "Puffer Vest" },
+        "pants": { "id": "gear.winter.pants", "name": "Snow Pants" },
+        "shoes": { "id": "gear.winter.shoes", "name": "Snow Boots" },
+        "backpack": { "id": "gear.winter.backpack", "name": "Pack with Bedroll" },
+        "held": { "id": "gear.winter.held", "name": "Snowball" }
+      }
+    },
+    {
+      "id": "deep-sea", "name": "Deep Sea", "tier": "epic",
+      "items": {
+        "headgear": { "id": "gear.deep-sea.headgear", "name": "Brass Diving Helmet" },
+        "shirt": { "id": "gear.deep-sea.shirt", "name": "Ribbed Dive Suit" },
+        "pants": { "id": "gear.deep-sea.pants", "name": "Dive Trousers" },
+        "shoes": { "id": "gear.deep-sea.shoes", "name": "Weighted Boots" },
+        "backpack": { "id": "gear.deep-sea.backpack", "name": "Aquarium Tank Pack" },
+        "held": { "id": "gear.deep-sea.held", "name": "Glass Float Lantern" }
+      }
+    },
+    {
+      "id": "carnival", "name": "Carnival", "tier": "epic",
+      "items": {
+        "headgear": { "id": "gear.carnival.headgear", "name": "Ringmaster Top Hat" },
+        "shirt": { "id": "gear.carnival.shirt", "name": "Tailcoat" },
+        "pants": { "id": "gear.carnival.pants", "name": "Striped Trousers" },
+        "shoes": { "id": "gear.carnival.shoes", "name": "Platform Boots" },
+        "backpack": { "id": "gear.carnival.backpack", "name": "Music Box Pack" },
+        "held": { "id": "gear.carnival.held", "name": "Kite Spool" }
+      }
+    },
+    {
+      "id": "cosmic", "name": "Cosmic", "tier": "legendary", "breaks_silhouette": true,
+      "items": {
+        "headgear": { "id": "gear.cosmic.headgear", "name": "Orbiting Halo Ring" },
+        "shirt": { "id": "gear.cosmic.shirt", "name": "Winged Coat" },
+        "pants": { "id": "gear.cosmic.pants", "name": "Hover Skirt", "hide_flags": ["gear.cosmic.shoes"] },
+        "shoes": { "id": "gear.cosmic.shoes", "name": "Anti-grav Boots" },
+        "backpack": { "id": "gear.cosmic.backpack", "name": "Folded Wing Rig" },
+        "held": { "id": "gear.cosmic.held", "name": "Star-catching Net" }
+      }
+    }
+  ]
+}
