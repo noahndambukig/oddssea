@@ -394,6 +394,7 @@ continuous deployment.
 | Browser says NXDOMAIN right after a successful deploy, but `nslookup <name> 8.8.8.8` resolves | **Negative caching**: your resolver looked the name up before the record existed and cached the non-existence (SOA negative TTL — Route53 default 900s) | Wait ≤15 min, or point the browser at a public resolver (Chrome → Use secure DNS) |
 | Deploy hangs at `Certificate … CREATE_IN_PROGRESS` | Nameservers haven't propagated; ACM can't see its validation record | Part 2 check; wait; the deploy resumes on its own once DNS answers |
 | `Zone … not found` at synth | Hosted zone missing, or shell has no credentials for the lookup | Create the zone / `aws login` |
+| CI synth: `«StackAccountRegionNotSpecified» Cannot retrieve value from context provider` | Stack account derived from credentials CI doesn't have — without a concrete account+region CDK cannot even build the key to read the committed context cache | Pin `account` in `lib/config.ts`; account IDs are not secrets |
 | CI/CD stack fails: `provider already exists` | Account already has a GitHub OIDC provider | `createGithubOidcProvider: false` in config.ts |
 | Actions credentials step: `Not authorized to perform sts:AssumeRoleWithWebIdentity` | Repo/branch doesn't match the `sub` condition, or the variable holds the wrong ARN | Compare cicd-stack.ts condition to the actual repo+branch; re-check `AWS_DEPLOY_ROLE_ARN` |
 | Actions credentials step: `Credentials could not be loaded` | Workflow missing `id-token: write` | Already set in deploy.yml — check it wasn't edited out |

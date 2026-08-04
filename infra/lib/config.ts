@@ -10,6 +10,17 @@ export interface AppConfig {
   envName: string;
 
   /**
+   * The AWS account ID the stacks deploy into — pinned explicitly rather
+   * than derived from the shell's credentials, for two reasons: it lets
+   * credential-free CI read the cached hosted-zone lookup (the cache key in
+   * cdk.context.json includes account+region, so an env-agnostic stack
+   * cannot consult it), and it makes a deploy against the wrong account
+   * fail loudly instead of proceeding. Account IDs are not secrets — they
+   * appear in every ARN.
+   */
+  account: string;
+
+  /**
    * AWS region — pinned to us-east-1.
    *
    * CloudFront only accepts TLS certificates issued in us-east-1, no matter
@@ -60,6 +71,7 @@ export interface AppConfig {
 export const configs: Record<string, AppConfig> = {
   dev: {
     envName: 'dev',
+    account: '845081398483',
     region: 'us-east-1',
 
     // Requires the Route53 hosted zone to exist and the registrar's

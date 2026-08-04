@@ -21,10 +21,12 @@ if (config.domainName && config.region !== 'us-east-1') {
   );
 }
 
-// CDK needs a concrete account+region to look up the Route53 hosted zone.
-// Account comes from whatever credentials your shell holds; region from config.
+// A fully concrete environment. The account is pinned in config rather than
+// read from the shell's credentials — that is what lets credential-free CI
+// synthesise using the cached lookups in cdk.context.json, and what makes a
+// deploy with credentials for the wrong account fail instead of proceeding.
 const env: cdk.Environment = {
-  account: process.env.CDK_DEFAULT_ACCOUNT,
+  account: config.account,
   region: config.region,
 };
 
