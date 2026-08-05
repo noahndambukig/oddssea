@@ -120,6 +120,17 @@ it has caught real errors every time it has been run.
 
 **One topic per file.** If a file needs "and" to describe it, split it.
 
+**Clean up tooling artefacts when finished.** Anything a tool writes into the
+repo as a side effect of *doing* the work — never as the work itself — is
+deleted in the same session that created it. Browser automation is the usual
+offender: Playwright MCP drops `.playwright-mcp/` (console logs, page
+snapshots) and screenshots wherever it is pointed. Close the browser, stop any
+dev server that was started for it, and remove the files. Do not gitignore them
+instead — an ignore rule makes the mess permanent and invisible, whereas the
+files are evidence for exactly one session and worthless after it. If something
+a tool produced genuinely matters, it earns a real home in `docs/` or
+`journal/` under its own name.
+
 **Update frontmatter `status`** when a file's state changes:
 `draft` -> `agreed` -> `locked`. Locked means it is built against; changing it
 requires a decision entry.
@@ -136,7 +147,7 @@ requires a decision entry.
 | Launch game roster | Chosen — 7 games (`docs/decisions/0007`) — specs drafted, `docs/01-game/game-modes.md` |
 | Core game loop | Drafted — `docs/01-game/` (core-loop + tasks), awaiting review |
 | Platform + hosting | Agreed — web-first PWA on AWS, `docs/04-technical/` |
-| Deployment skeleton | **Increment A live** — oddssea.xyz, keyless CI/CD proven. **Increment B built** (Cognito login on auth.oddssea.xyz, PKCE, 18+ gate, `decisions/0017`) — **first deploy pending**; C (API) next; walkthrough in `infra/README.md` |
+| Deployment skeleton | **Increments A + B live** — oddssea.xyz on keyless CI/CD; Cognito login on auth.oddssea.xyz, PKCE, 18+ gate (`decisions/0017`), verified end to end in a browser. Login-page branding deliberately deferred to late polish. **C (API) next — plan it in conversation first**; walkthrough in `infra/README.md` |
 | Data model | Drafted — `docs/04-technical/data-model.md` (`decisions/0015`), awaiting review |
 | Compliance | Agreed — no-real-money wall, v1 posture (`docs/06-risks/compliance.md`) |
 
