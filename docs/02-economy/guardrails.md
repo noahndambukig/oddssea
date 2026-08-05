@@ -39,7 +39,7 @@ more resentment than prestige.
 | Shell destruction ratio (edge × handle ÷ task faucet, weekly) | ≥ 0.90 |
 | Median Shell balance | Flat or gently rising — never compounding |
 | Median Pearl balance | Flat — a climbing balance means crate prices are too low |
-| Basic crates opened/week | ~53 committed · ~19 casual |
+| Basic crates opened/week | the anchor in `currency-model.md` (~±10%) |
 | Bust rate, typical stake sizing | ~0 — busting should be self-inflicted |
 | Share of players with "nothing left to chase" | < 5% |
 | Legendary pool size ÷ fastest player's Legendary count | > 1 at all times |

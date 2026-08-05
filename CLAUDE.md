@@ -109,9 +109,14 @@ add a dated entry in `docs/decisions/`. Do not edit the old rationale away.
 results-of-record table in `docs/02-economy/simulations/README.md`:
 
 ```bash
-python3 docs/02-economy/simulations/set-completion.py
-python3 docs/02-economy/simulations/crate-rates.py
+python docs/02-economy/simulations/bankroll.py     # run first — the other chains off it
+python docs/02-economy/simulations/crate-game.py
 ```
+
+Every simulation is **seeded**, so a re-run reproduces the results of
+record exactly and any difference is a real change. `set-completion.py`
+and `crate-rates.py` are historical (pre-revamp coin economy) and produce
+no current figure — this block named those two until `decisions/0019`.
 
 **Verify before declaring done.** Every spec session ends with a verification
 pass — simulate the numbers, grep for contradictions against existing specs,
@@ -142,10 +147,10 @@ requires a decision entry.
 | Cosmetic system | Agreed, simulated, not playtested |
 | Gear roster | Chosen — 11 families (`docs/decisions/0013`), `docs/03-cosmetics/content/gear-roster.md` |
 | Skin roster | Chosen — 11 families, cosmic is Void Weave — `docs/03-cosmetics/content/skin-roster.md` |
-| Content data | Shipped — `docs/03-cosmetics/content/data/*.json`, version 1.0.0; racers in `docs/01-game/racers.md` |
-| Economy | Agreed — wager economy simulated (`docs/decisions/0005`–`0011`), **not playtested** |
-| Launch game roster | Chosen — 7 games (`docs/decisions/0007`) — specs drafted, `docs/01-game/game-modes.md` |
-| Core game loop | Drafted — `docs/01-game/` (core-loop + tasks), awaiting review |
+| Content data | Shipped — `docs/03-cosmetics/content/data/*.json` at 1.0.0, `racers.json` at **1.1.0** (`decisions/0019`); racers in `docs/01-game/racers.md` |
+| Economy | Agreed — wager economy simulated and **seeded/reproducible** (`docs/decisions/0005`–`0011`, `0019`), **not playtested** |
+| Launch game roster | **Agreed** — 7 games (`docs/decisions/0007`), Pass 3 verified (`docs/decisions/0019`) |
+| Core game loop | **Agreed** — `docs/01-game/` (core-loop, tasks, game-modes, racers) all Pass 3 verified (`docs/decisions/0019`) |
 | Platform + hosting | Agreed — web-first PWA on AWS, `docs/04-technical/` |
 | Deployment skeleton | **Complete — A, B and C all live and verified.** oddssea.xyz on keyless CI/CD; Cognito login on auth.oddssea.xyz with PKCE + 18+ gate (`decisions/0017`); api.oddssea.xyz serving `/health` and a JWT-guarded `/me` (401/403/200 all confirmed, rejections provably run no Lambda). Login-page branding deferred to late polish. Next milestone is the ledger — walkthrough in `infra/README.md` |
 | Data model | **Agreed** — `docs/04-technical/data-model.md`; Pass 3 found 11 issues, 4 that would have shipped broken (`decisions/0015`, `0018`) |

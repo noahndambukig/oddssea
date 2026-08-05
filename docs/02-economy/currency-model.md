@@ -39,12 +39,51 @@ Task structure lives in `01-game/tasks.md`; the payouts live here.
 The referral threshold (300) sits below the onboarding chain total (400)
 by design — see `01-game/tasks.md`.
 
+**Referral ladder** (cosmetics, not Shells — costs the economy nothing):
+exclusive items at **5, 10 and 25** successful referrals.
+
+**Onboarding grant, one-time:** **3 Basic crates**, opened during the
+tour. Three is not arbitrary — it is exactly the window
+`03-cosmetics/crates.md`'s first-session guarantee covers, so a new player
+finishes the tour with a garment and a skin that can be worn together.
+Pearls come only from wagering (`decisions/0005`), so the first crates
+have to be granted rather than bought; this line is what stops that grant
+being invisible.
+
+### Task completion targets
+
+Structure is in `01-game/tasks.md`; the thresholds live here.
+
+| Task | Target |
+|---|---|
+| Daily: place N bets (any game) | 10 |
+| Daily: attend N races | 3 |
+| Daily: play 2 different games | 2 |
+| Weekly: place N bets across M different games | 100 bets · 4 games |
+| Weekly: attend N races | 12 |
+
+Sized against the reference patterns below: a casual player places ~45
+bets on an active day, so every daily target is comfortably inside one
+session and the weekly ones inside four. Race-attendance targets assume a
+minutes-scale cadence and are the two figures to revisit when the cadence
+lands (`01-game/core-loop.md`, open question).
+
 ### Reference earn rates
+
+**Derived from the task table above, not estimated.** Committed:
+550 login (50→100, capped day 6) + 175 first-bet + 1,575 dailies +
+1,100 weeklies. Casual: 4 non-consecutive days, so the streak resets to
+50 each time.
 
 | Player | Pattern | Shells |
 |---|---|---|
-| **Committed** | 7 days, full streak, all dailies + weeklies | ~500/day · **~3,550/week** |
-| **Casual** | 4 days, 2 of 3 dailies, consistency weekly | ~350/day · **~1,400/week** |
+| **Committed** | 7 days, full streak, all dailies + weeklies | ~486/day · **3,400/week** |
+| **Casual** | 4 days, 2 of 3 dailies, consistency weekly | 350/day · **1,400/week** |
+
+Committed read ~500/day · ~3,550/week until 2026-08-05, when Pass 3
+priced the task structure and found neither figure matched it
+(`decisions/0019`). If a task payout changes, recompute both here **and**
+in `simulations/bankroll.py`, which declares the same constants.
 
 ## Shells out — wagering
 
@@ -59,8 +98,8 @@ one casual day funds 35 minimum bets, the comeback floor.
 | Blackjack | 1.5% effective | ~2.0 |
 
 At the reference mix (40% races, 30% instant, 20% roulette, 10%
-blackjack) the blended edge is ~5.6%. Reference handle: **~74,000/week
-committed, ~27,000/week casual**.
+blackjack) the blended edge is ~5.6%. Reference handle: **~72,400/week
+committed, ~27,300/week casual**.
 
 ### Game parameters
 
@@ -91,7 +130,7 @@ Per bet: **0.75 × stake × edge**, plus on a win **0.30 × stake × edge ×
 odds**. Expected total ≈ 1.05 Pearls per Shell of theoretical loss,
 identical across games (farm-proof); long-odds wins pay visibly more.
 
-Reference Pearl income: **~4,200/week committed, ~1,550/week casual**
+Reference Pearl income: **~4,150/week committed, ~1,560/week casual**
 (includes the knock-on handle from the lottery and tip faucets).
 
 ## Pearls out — crates, shop and sinks
@@ -127,17 +166,17 @@ Crates per chase. Drop tables live in `03-cosmetics/crates.md`.
 
 | Outcome | Committed | Casual |
 |---|---|---|
-| Basic crates/week | ~53 | ~19 |
-| First Legendary (median / p90) | 1.3 / 3.8 wk | 3.7 / 10.5 wk |
-| Pity fires | ~14% of chases | ~14% |
-| Legendaries/year | ~32 | ~11 |
-| Set completion (median / p90) | 3 / 8 wk | 8 / 22 wk |
+| Basic crates/week | ~52 | ~20 |
+| First Legendary (median / p90) | 1.3 / 3.8 wk | 3.5 / 10.0 wk |
+| Pity fires | ~13% of chases | ~14% |
+| Legendaries/year | ~31 | ~12 |
+| Set completion (median / p90) | 3 / 9 wk | 7 / 22 wk |
 | Busts/week (typical stake sizing) | 0 | 0 |
-| Shell destruction ratio | ~0.92 | ~0.91 |
+| Shell destruction ratio | ~0.93 | ~0.92 |
 
 ## The tensions to watch
 
-**Destruction sits at ~0.92 for both profiles** — above the 0.90 floor
+**Destruction sits at ~0.93 for both profiles** — above the 0.90 floor
 but with little headroom, because three faucets now feed one sink. Every
 new faucet must be re-simulated before it ships; the lottery and tip
 faucets each pushed crates/week off-anchor when added and were sized
@@ -152,6 +191,6 @@ tipping social rather than economic.
 the tail; if playtests show casuals stalling at 5/6, tighten the rotation
 interval before touching drop rates.
 
-**Catalogue expansion is an economy input** (`decisions/0011`): ~32
+**Catalogue expansion is an economy input** (`decisions/0011`): ~31
 Legendaries/year for committed players means the Legendary pool must grow
 by roughly one item per month or the top of the catalogue runs dry.

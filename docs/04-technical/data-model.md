@@ -199,13 +199,17 @@ recipient's row lock, like lottery ticket caps.
 5. **Every random outcome stores its roll and content version** — crate
    opens, race results, crash busts, lottery draws, racer weight drift,
    and every card dealt or wheel spun at a table.
-6. **Days are UTC.** Every calendar-scoped rule — daily and weekly
-   tasks, login streaks, tip caps, ticket caps, both lottery draws —
-   resolves against UTC, for every player, everywhere. One boundary is
-   auditable and cannot be shopped by changing a timezone; the shared
-   lottery draw needs a single global boundary regardless of what
-   players might prefer individually. The cost is a reset at an awkward
-   local hour for some, accepted knowingly.
+6. **Days are UTC, and weeks start Monday 00:00 UTC.** Every
+   calendar-scoped rule — daily and weekly tasks, login streaks, tip
+   caps, ticket caps, both lottery draws — resolves against that
+   boundary, for every player, everywhere. One boundary is auditable and
+   cannot be shopped by changing a timezone; the shared lottery draws
+   need a single global boundary regardless of what players might prefer
+   individually. Monday is the ISO-8601 week, which is what every date
+   library defaults to — choosing anything else means an explicit offset
+   in every calculation forever. The cost is a reset at an awkward local
+   hour for some players, accepted knowingly (`decisions/0018`, week
+   start added by `decisions/0019`).
 7. **Item instances are never deleted** — `consumed` is a state.
 8. **Hidden racer weights are server-only.**
 

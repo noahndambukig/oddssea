@@ -1,6 +1,13 @@
 """How long does a six-piece set take? Coupon-collector with a distinct-pull guarantee."""
 import random, statistics
 
+# Fixed seed: the results-of-record table in README.md must be reproducible.
+# Unseeded, re-running moved committed crates/week by +/-4%, which is larger
+# than most real changes -- so 're-run before changing a number' could not
+# tell a change from noise. Vary this only for deliberate sensitivity runs.
+SEED = 20260805
+random.seed(SEED)
+
 COMMITTED_PER_DAY = 425.0
 CASUAL_PER_DAY = 1400 / 7
 SET_CRATE_PRICE = 900
