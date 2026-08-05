@@ -12,12 +12,27 @@ comeback floor ~35 min bets, classic edge split.
 import random
 from statistics import mean, median
 
+# Fixed seed: the results-of-record table in README.md must be reproducible.
+# Unseeded, re-running moved committed crates/week by +/-4%, which is larger
+# than most real changes -- so 're-run before changing a number' could not
+# tell a change from noise. Vary this only for deliberate sensitivity runs.
+SEED = 20260805
+random.seed(SEED)
+
 # ---- candidate constants (proposal — become currency-model.md on approval)
 MIN_BET = 10
 
 # task faucet, Shells/day on an active day (login+streak avg, first bet,
 # 3 dailies, weekly share). Committed plays 7 days, casual 4.
-INCOME = {"committed": 500, "casual": 350}
+#
+# These are DERIVED from the task table in currency-model.md, not chosen:
+#   committed  550 login (50..100, cap day 6) + 175 first-bet + 1,575 dailies
+#              + 1,100 weeklies = 3,400/wk over 7 days = 486/day
+#   casual     200 login (streak resets on non-consecutive days) + 100
+#              + 600 (2 of 3 dailies) + 500 consistency = 1,400/wk over 4 = 350
+# Committed read 500 until 2026-08-05: a round number that no longer matched
+# the table it summarised. If a task payout changes, recompute these.
+INCOME = {"committed": 486, "casual": 350}
 ACTIVE_DAYS = {"committed": 7, "casual": 4}
 BETS_PER_DAY = {"committed": 80, "casual": 45}
 

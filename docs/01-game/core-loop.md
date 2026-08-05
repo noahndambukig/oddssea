@@ -1,7 +1,7 @@
 ---
-status: draft
+status: agreed
 purpose: How a play session works, from logging in to logging out.
-depends-on: ../decisions/0005-wagering-earns-the-cosmetic-currency.md, ../decisions/0007-seven-game-launch-roster.md, ../decisions/0008-no-seasons-in-v1.md
+depends-on: ../decisions/0005-wagering-earns-the-cosmetic-currency.md, ../decisions/0007-seven-game-launch-roster.md, ../decisions/0008-no-seasons-in-v1.md, ../decisions/0019-pass-3-on-the-game-specs.md
 ---
 
 # Core Loop
@@ -55,6 +55,11 @@ the weekly task reset.
 | Day | Login claim, daily tasks, daily draw |
 | Week | Weekly tasks, weekly draw |
 
+**Days run on UTC and weeks start Monday 00:00 UTC**
+(`../04-technical/data-model.md`, rule 6). One global boundary for
+everyone: it is what makes a shared daily and weekly draw possible at all
+— one pot, one deadline — and it cannot be gamed by changing a timezone.
+
 Nothing is longer than a week. There are no seasons in v1
 (`decisions/0008`).
 
@@ -62,9 +67,16 @@ Nothing is longer than a week. There are no seasons in v1
 
 Onboarding is a guided tour whose steps are paid one-time tasks — the tour
 *is* the starter grant. In order: what Shells and Pearls are, open your
-free crate, equip what you pulled, watch a race, place a first bet. A new
+free crates, equip what you pulled, watch a race, place a first bet. A new
 player finishes the tour funded, dressed and having seen the two loops
 (wager and collect) with their own eyes.
+
+The crates are **granted, not bought** — Pearls come only from wagering
+(`decisions/0005`), so a player who has not yet bet cannot have any. The
+grant is three, which is exactly the window
+`../03-cosmetics/crates.md`'s first-session guarantee covers, so "dressed"
+is a guarantee rather than a hope. Figures in
+`../02-economy/currency-model.md`.
 
 ## Rules
 
@@ -93,5 +105,10 @@ player finishes the tour funded, dressed and having seen the two loops
 
 ## Numbers
 
-Every payout, threshold and interval lives in
-`../02-economy/currency-model.md`, pending the bankroll-ruin simulation.
+Every payout and threshold lives in `../02-economy/currency-model.md`,
+derived and simulated (`simulations/README.md`).
+
+**Timings are not currency figures and do not live there.** Per-game
+windows — the race spectacle, the crash betting window, the roulette spin
+timer — are mechanics and live in `game-modes.md`. The one timing this
+file owns is the race cadence, which is still open below.

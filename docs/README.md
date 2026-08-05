@@ -26,11 +26,11 @@ purpose: Index of every spec and its current state. Keep this current — it is 
 | `00-project/spec-workflow.md` | Agreed |
 | `00-project/glossary.md` | Agreed |
 | `00-project/identity.md` | Agreed — icon is the sailboat |
-| `01-game/core-loop.md` | Draft |
-| `01-game/tasks.md` | Draft |
-| `01-game/game-modes.md` | Draft |
-| `01-game/racers.md` | Draft — 14-racer roster authored |
-| `03-cosmetics/content/data/*.json` | Shipped — content version 1.0.0 (`decisions/0015`) |
+| `01-game/core-loop.md` | Agreed — Pass 3 verified (`decisions/0019`) |
+| `01-game/tasks.md` | Agreed — Pass 3 verified (`decisions/0019`) |
+| `01-game/game-modes.md` | Agreed — Pass 3 verified (`decisions/0019`) |
+| `01-game/racers.md` | Agreed — 14-racer roster authored, Pass 3 verified (`decisions/0019`) |
+| `03-cosmetics/content/data/*.json` | Shipped — 1.0.0; `racers.json` at 1.1.0 (`decisions/0015`, `0019`) |
 | `02-economy/currency-model.md` | Agreed — simulated, not playtested |
 | `02-economy/dust.md` | Superseded (`decisions/0005`) |
 | `02-economy/guardrails.md` | Agreed — simulated, not playtested |
@@ -48,5 +48,5 @@ purpose: Index of every spec and its current state. Keep this current — it is 
 
 ## Suggested order for what's next
 
-1. Review the remaining drafts (`01-game/core-loop`, `tasks`, `game-modes`, `racers`) to `agreed` — Pass 3, as run on `data-model` on 2026-08-05, which found four issues that would have shipped broken.
+1. **Every spec is now `agreed`.** Pass 3 ran on all five remaining drafts on 2026-08-05 (`decisions/0018`, `0019`) and found 27 issues, including four in the data model that would have shipped broken and a faucet figure that no longer matched the tasks it summarised.
 2. The deployment skeleton is live (`infra/README.md`); the ledger milestone builds against `data-model.md`, starting with the BFF that `decisions/0017` gates it behind.

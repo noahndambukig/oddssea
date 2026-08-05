@@ -1,10 +1,10 @@
 {
-  "content_version": "1.0.0",
+  "content_version": "1.1.0",
   "_note": "Racer roster per 01-game/racers.md. base_weight is the relative true-win weight seeding racer_state (data-model.md); volatility is per-race performance variance; drift is how fast the hidden weight wanders week to week. Hidden values never reach the client.",
   "racers": [
     { "id": "racer.sure-thing", "name": "Sure Thing", "species": "sea turtle",
       "blurb": "The favourite. Calm, huge, metronomic. Beats you slowly.",
-      "base_weight": 88, "volatility": 0.20, "drift": 0.20 },
+      "base_weight": 98, "volatility": 0.20, "drift": 0.20 },
     { "id": "racer.riptide", "name": "Riptide", "species": "marlin",
       "blurb": "Raw speed, zero temperament control. Best and worst racer in the sea, some weeks both.",
       "base_weight": 95, "volatility": 0.80, "drift": 0.70 },
@@ -16,7 +16,7 @@
       "base_weight": 75, "volatility": 0.40, "drift": 0.25 },
     { "id": "racer.second-wind", "name": "Second Wind", "species": "manta ray",
       "blurb": "Slow starts, monstrous finishes. Form comes and goes in long cycles.",
-      "base_weight": 70, "volatility": 0.55, "drift": 0.60 },
+      "base_weight": 70, "volatility": 0.55, "drift": 0.75 },
     { "id": "racer.undertow", "name": "Undertow", "species": "moray eel",
       "blurb": "Comes from nowhere, always from behind. Unsettling to bet on, worse to bet against.",
       "base_weight": 65, "volatility": 0.75, "drift": 0.50 },

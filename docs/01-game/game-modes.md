@@ -1,15 +1,24 @@
 ---
-status: draft
+status: agreed
 purpose: The rules of each launch game — how bets are placed, resolved and presented.
-depends-on: core-loop.md, ../decisions/0007-seven-game-launch-roster.md, ../decisions/0014-lottery-house-match.md
+depends-on: core-loop.md, ../decisions/0007-seven-game-launch-roster.md, ../decisions/0014-lottery-house-match.md, ../decisions/0019-pass-3-on-the-game-specs.md
 ---
 
 # Game Modes
 
-Seven games (`decisions/0007`). Edges, odds parameters, minimum bet and
-lottery figures live in `../02-economy/currency-model.md`; this file is
-mechanics only. Every outcome resolves server-side
-(`../04-technical/hosting.md`).
+## What this is
+
+How each of the seven launch games (`decisions/0007`) actually plays —
+what you bet on, how it resolves, and what the table or track looks like
+while it does. **Mechanics only.** Edges, odds parameters, minimum bet,
+crash cap, roster size and every lottery figure live in
+`../02-economy/currency-model.md`; this file names them and links rather
+than repeating them, because a figure written in two places is wrong in
+one of them within a month (`../00-project/doc-conventions.md`). Timings
+below are game feel, not currency, so they do live here.
+
+Every outcome resolves server-side (`../04-technical/hosting.md`), and
+every roll is logged (`../04-technical/data-model.md`, rule 5).
 
 ## Sea races — the metronome
 
@@ -19,8 +28,9 @@ a ~45-second spectacle, then settlement. The stands are a shared space —
 spectator avatars are visible, which is the flex layer on stage.
 
 **Persistent roster.** Racers are named sea creatures from a stable
-roster (~14 at launch; 6–8 race per field), each with personality and
-**visible form** — recent finishes, win rate, preferred conditions.
+roster, a subset of which contests each field (`racers.md`; sizes in the
+currency model), each with personality and **visible form** — recent
+finishes, win rate, preferred conditions.
 Players study form like horse racing. Form is engagement, not exploitable
 edge: each racer carries hidden true win probabilities that drift slowly
 over time, and displayed odds are always derived from those probabilities
@@ -36,7 +46,8 @@ from 1.00× until it busts. Cash out any time before the bust to lock
 stake × current multiplier. Everyone rides the same curve and cashouts
 are visible in the feed — seeing others bail is the game. Auto-cashout
 at a player-set multiplier is supported. The bust distribution is derived
-directly from the game's edge; capped at 1,000×.
+directly from the game's edge, up to the multiplier cap in the currency
+model.
 
 ## Roulette — the shared table
 
@@ -54,13 +65,14 @@ the theo-based Pearl rule in force (`decisions/0009`), which it is.
 
 ## Lottery — the countdown
 
-A raffle with a pooled pot: every ticket is an entry, and **the pot is
-1.5× ticket sales — the house matches 50%, free** (`decisions/0014`).
-Daily draw (one winner) and weekly draw (three winners, split 60/30/10).
-Per-player ticket caps per draw — figures in the currency model. The
-free weekly ticket from `tasks.md` counts toward the weekly cap.
-**Tickets earn no Pearls.** The pot is displayed live, site-wide, under
-the countdown.
+A raffle with a pooled pot: every ticket is an entry, and **the house
+matches a fixed share of ticket sales, free** — which is what makes the
+lottery deliberately positive-EV (`decisions/0014`). Daily draw pays one
+winner; the weekly pays three on a fixed split. Multiplier, split and
+per-player ticket caps are all in the currency model. The free weekly
+ticket from `tasks.md` counts toward the weekly cap. **Tickets earn no
+Pearls.** The pot is displayed live, site-wide, under the countdown, and
+both draws close on the UTC boundaries in `core-loop.md`.
 
 ## Plinko — the solo drop
 

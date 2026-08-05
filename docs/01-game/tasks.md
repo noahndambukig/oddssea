@@ -1,17 +1,19 @@
 ---
-status: draft
+status: agreed
 purpose: Every way a player earns Shells outside of wagering.
-depends-on: core-loop.md, ../decisions/0005-wagering-earns-the-cosmetic-currency.md, ../decisions/0008-no-seasons-in-v1.md
+depends-on: core-loop.md, ../decisions/0005-wagering-earns-the-cosmetic-currency.md, ../decisions/0008-no-seasons-in-v1.md, ../decisions/0019-pass-3-on-the-game-specs.md
 ---
 
 # Tasks
 
 ## What this is
 
-The Shell faucet, itemised. Task *structure* lives here and is stable;
-task *payouts* are relative sizes (S/M/L) until the simulations set real
-figures in `../02-economy/currency-model.md`. The roster of rotating
-challenges will grow like content; the categories should not.
+The Shell faucet, itemised. Task *structure* lives here; every payout and
+completion target lives in `../02-economy/currency-model.md`, which
+derives its reference earn rates from this structure. The sizes below
+(S/M/L) are the relative shape — the figures are set and simulated. The
+roster of rotating challenges will grow like content; the categories
+should not.
 
 ## Daily
 
@@ -19,7 +21,7 @@ Constant every day:
 
 | Task | Size | Notes |
 |---|---|---|
-| Login claim | S, streak-scaled | Grows over consecutive days, caps at day 7, missing a day resets the streak |
+| Login claim | S, streak-scaled | Grows over consecutive days to a cap, missing a day resets the streak |
 | First bet of the day | S | Converts logins into play |
 
 Plus **three challenges drawn daily** from a rotating pool:
@@ -62,9 +64,9 @@ The largest reward in the task system — growth is the explicit priority.
   account that merely exists never triggers it.
 - **Both sides are paid.** The referee gets a starter boost on top of
   onboarding, so an invite feels like a gift.
-- **The ladder pays cosmetics.** Exclusive items at 5, 10 and 25 successful
-  referrals — prestige that costs the economy nothing and advertises
-  itself in the race stands.
+- **The ladder pays cosmetics.** Exclusive items at three referral
+  milestones (`../02-economy/currency-model.md`) — prestige that costs the
+  economy nothing and advertises itself in the race stands.
 - **The threshold is the anti-abuse lever.** Referrals pay a wagerable
   currency, so farming is the failure mode to watch. Instrument referral
   conversion from day one; if farming appears, raise the threshold —
@@ -86,7 +88,18 @@ The largest reward in the task system — growth is the explicit priority.
 - No lifetime-wagered milestones — handle is already rewarded in Pearls;
   paying Shells for it would double-dip.
 
+## Open questions
+
+- **The two race-attendance targets** (daily and weekly) assume a
+  minutes-scale race cadence, which is itself still open
+  (`core-loop.md`). They are the figures to revisit when it lands; every
+  other target is cadence-independent.
+
 ## Numbers
 
-All task payouts, the streak curve and the referral threshold live in
-`../02-economy/currency-model.md`, pending the bankroll-ruin simulation.
+All task payouts, the streak curve, completion targets, the referral
+threshold and the referral ladder live in
+`../02-economy/currency-model.md`. That file's reference earn rates are
+**derived from the structure on this page** — change a task here and
+recompute them there, along with the matching constants in
+`../02-economy/simulations/bankroll.py`.
