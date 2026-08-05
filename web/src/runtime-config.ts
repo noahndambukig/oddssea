@@ -22,10 +22,21 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
   if (cached) return cached;
 
   // Deployed: the file the stack uploaded.
+  //
+  // A 200 is NOT enough to conclude the file exists. Vite's dev server (and
+  // the deployed CloudFront error mapping, by design) answers unmatched
+  // paths with index.html and a 200 — so a missing config.json arrives as
+  // HTML wearing a success status. Check the content type, and still guard
+  // the parse: the whole point of this branch is to fall through cleanly to
+  // the local .env.local path below when the file is not really there.
   const response = await fetch('/config.json', { cache: 'no-store' }).catch(() => null);
-  if (response?.ok) {
-    cached = (await response.json()) as RuntimeConfig;
-    return cached;
+  if (response?.ok && response.headers.get('content-type')?.includes('application/json')) {
+    try {
+      cached = (await response.json()) as RuntimeConfig;
+      return cached;
+    } catch {
+      // Malformed JSON — fall through rather than crash the app on boot.
+    }
   }
 
   // Local `npm run dev`: no deployed config.json — read web/.env.local,

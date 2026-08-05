@@ -536,6 +536,7 @@ else would catch).
 | Tokens fail with `invalid_grant` at the token endpoint | The code was already spent (back button, double navigation), or the PKCE verifier is gone | Start a fresh login; the app consumes its verifier after one use by design |
 | Attestation write fails with "Access Token does not have required scopes" | The token was minted without `aws.cognito.signin.user.admin` | The authorize request must ask for it — check SCOPES in auth-client.ts; sign out and in to mint a fresh token |
 | The 18+ gate reappears after a reload | The stored ID token predates the attestation and lacks the claim | The gate forces a token refresh after writing; if it recurs, check forceRefresh ran and GetUser fallback is reachable |
+| `npm run dev` shows "Unexpected token '<', \"<!doctype \"... is not valid JSON" | The dev server answers *any* unmatched path with index.html and a **200**, so a missing `/config.json` arrives as HTML wearing a success status | `runtime-config.ts` checks the content type before parsing, then falls through to `web/.env.local`. If you see this, `.env.local` is missing or incomplete |
 
 ---
 
