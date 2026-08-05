@@ -25,8 +25,17 @@ export class Web extends Construct {
   readonly bucket: s3.Bucket;
   readonly distribution: cloudfront.Distribution;
 
-  /** The origin the browser loads the app from, e.g. https://dev.oddssea.xyz */
+  /** The origin the browser loads the app from, e.g. https://oddssea.xyz */
   readonly appUrl: string;
+
+  /**
+   * The A record for the canonical hostname — the apex, since the app
+   * serves from oddssea.xyz itself. Exposed because Cognito's custom auth
+   * domain requires the PARENT domain (the apex) to resolve at creation
+   * time, and CloudFormation cannot see that prerequisite — the Auth
+   * construct takes this and declares the dependency explicitly.
+   */
+  readonly apexRecord?: route53.ARecord;
 
   constructor(scope: Construct, id: string, props: WebProps) {
     super(scope, id);
@@ -69,6 +78,42 @@ export class Web extends Construct {
       });
     }
 
+    /**
+     * Canonical-origin redirect, evaluated at the edge on every request.
+     *
+     * The distribution answers on its generated *.cloudfront.net hostname
+     * as well as the canonical oddssea.xyz — alternate domain names never
+     * disable the generated one. Serving the app there would break logins
+     * started from it (OAuth callbacks are registered for the canonical
+     * origin only), so any non-canonical host bounces. 302 keeps the
+     * arrangement revisable without fighting browser redirect caches.
+     */
+    const redirectFunction =
+      hostname !== undefined
+        ? new cloudfront.Function(this, 'CanonicalRedirect', {
+            runtime: cloudfront.FunctionRuntime.JS_2_0,
+            comment: `Redirect every non-canonical host to ${hostname}`,
+            code: cloudfront.FunctionCode.fromInline(`
+function handler(event) {
+  var request = event.request;
+  var host = request.headers.host.value;
+  if (host !== '${hostname}') {
+    var qs = '';
+    var keys = Object.keys(request.querystring);
+    for (var i = 0; i < keys.length; i++) {
+      qs += (qs ? '&' : '?') + keys[i] + '=' + request.querystring[keys[i]].value;
+    }
+    return {
+      statusCode: 302,
+      statusDescription: 'Found',
+      headers: { location: { value: 'https://${hostname}' + request.uri + qs } },
+    };
+  }
+  return request;
+}`),
+          })
+        : undefined;
+
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultRootObject: 'index.html',
       defaultBehavior: {
@@ -79,6 +124,14 @@ export class Web extends Construct {
         // config.json revalidate. See app-stack.ts.
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         compress: true,
+        functionAssociations: redirectFunction
+          ? [
+              {
+                function: redirectFunction,
+                eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+              },
+            ]
+          : undefined,
       },
       domainNames: hostname ? [hostname] : undefined,
       certificate,
@@ -96,11 +149,23 @@ export class Web extends Construct {
     });
 
     if (hostedZone && hostname) {
-      // An alias record pointing the name at CloudFront. Alias is a
-      // Route53-specific record type: it resolves like an A record from the
-      // outside but points internally at an AWS resource, works at the zone
-      // apex where a CNAME cannot, and costs nothing to query.
-      new route53.ARecord(this, 'AliasRecord', {
+      // The canonical record — the zone apex itself, pointing at
+      // CloudFront. Alias is a Route53-specific record type: it resolves
+      // like an A record from the outside but points internally at an AWS
+      // resource, works at the zone apex where a CNAME cannot, and costs
+      // nothing to query. Because this IS the apex, it also satisfies
+      // Cognito's parent-must-resolve check for auth.oddssea.xyz — see the
+      // apexRecord property doc above.
+      //
+      // The construct id is 'ApexRecord' — NOT a free choice. CloudFormation
+      // tracks resources by logical ID, and the deployed stack already owns
+      // oddssea.xyz under this id (WebApexRecord…) from when the apex was a
+      // redirect target. Keeping the id means CFN sees "unchanged" here and
+      // simply deletes the old dev record; renaming it reads as a
+      // replacement, whose create-before-delete collides with the existing
+      // record at the same name. That exact failure rolled back the first
+      // flip deploy.
+      this.apexRecord = new route53.ARecord(this, 'ApexRecord', {
         zone: hostedZone,
         recordName: config.subdomain,
         target: route53.RecordTarget.fromAlias(

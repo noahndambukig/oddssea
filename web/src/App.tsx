@@ -1,59 +1,115 @@
-import { useEffect, useState } from 'react';
-
-/**
- * Increment A: prove the pipeline, nothing more.
- *
- * The page fetches /config.json — a file written at DEPLOY time by the CDK
- * stack, not baked into this build. Right now it only carries the environment
- * name, but it establishes the mechanism Increment B depends on: values that
- * do not exist until the infrastructure is created (user pool IDs, API URLs)
- * reach the browser through this file, so one build artifact works in any
- * environment.
- *
- * Locally (`npm run dev`) there is no deployed config.json, so the fetch
- * fails and the page shows "local" — that distinction doubles as a visible
- * check of which copy of the app you are looking at.
- */
-
-interface RuntimeConfig {
-  environment: string;
-  region: string;
-}
+import { useState } from 'react';
+import { useAuth } from './auth/AuthContext';
+import { AttestationGate } from './auth/AttestationGate';
+import { loadTokens } from './auth/token-store';
 
 export default function App() {
-  const [config, setConfig] = useState<RuntimeConfig | null>(null);
+  const { status, config, error, profile, attestedAt, login, logout } = useAuth();
+  const [showClaims, setShowClaims] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/config.json', { cache: 'no-store' })
-      .then((r) => (r.ok ? (r.json() as Promise<RuntimeConfig>) : null))
-      .then((c) => {
-        if (!cancelled && c) setConfig(c);
-      })
-      .catch(() => {
-        /* local dev — no deployed config */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  if (status === 'loading') {
+    return (
+      <main className="shell">
+        <p className="muted">Loading…</p>
+      </main>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <main className="shell">
+        <h1>oddssea</h1>
+        <div className="panel error">
+          <h2>Something went wrong</h2>
+          <pre>{error}</pre>
+        </div>
+      </main>
+    );
+  }
+
+  // The compliance gate: authenticated but not attested → nothing else
+  // renders. See auth/AttestationGate.tsx.
+  if (status === 'authenticated' && !attestedAt) {
+    return <AttestationGate />;
+  }
 
   return (
     <main className="shell">
-      <h1>oddssea</h1>
-      <p className="muted">
-        Increment A — a static page, served over HTTPS, deployed by a pipeline.
-      </p>
-      <dl className="facts">
-        <dt>Environment</dt>
-        <dd>
-          <code>{config?.environment ?? 'local'}</code>
-        </dd>
-        <dt>Served from</dt>
-        <dd>
-          <code>{window.location.origin}</code>
-        </dd>
-      </dl>
+      <header>
+        <h1>oddssea</h1>
+        <p className="muted">
+          Increment B — real accounts
+          {config?.environment ? ` · ${config.environment}` : ''}
+        </p>
+      </header>
+
+      {status === 'anonymous' ? (
+        <section className="panel">
+          <h2>You are not signed in</h2>
+          <p className="muted">
+            Signing in sends you to the hosted login page, then back here with
+            a one-time code this app exchanges for tokens. Open devtools →
+            Network before clicking to watch it happen.
+          </p>
+          <div className="actions">
+            <button onClick={() => login()}>Sign in</button>
+            <button className="secondary" onClick={() => login({ signUp: true })}>
+              Create an account
+            </button>
+          </div>
+        </section>
+      ) : (
+        <section className="panel">
+          <h2>Signed in</h2>
+          <dl className="facts">
+            <dt>User ID (sub)</dt>
+            <dd>
+              <code>{String(profile?.sub ?? '—')}</code>
+            </dd>
+            <dt>Email</dt>
+            <dd>
+              <code>{String(profile?.email ?? '—')}</code>
+            </dd>
+            <dt>Email verified</dt>
+            <dd>
+              <code>{String(profile?.email_verified ?? '—')}</code>
+            </dd>
+            <dt>18+ attested</dt>
+            <dd>
+              <code>{attestedAt ?? '—'}</code>
+            </dd>
+            <dt>Session expires</dt>
+            <dd>
+              <code>
+                {typeof profile?.exp === 'number'
+                  ? new Date(profile.exp * 1000).toLocaleTimeString()
+                  : '—'}
+              </code>
+            </dd>
+          </dl>
+          <div className="actions">
+            <button className="secondary" onClick={() => setShowClaims((v) => !v)}>
+              {showClaims ? 'Hide' : 'Show'} raw ID-token claims
+            </button>
+            <button className="secondary" onClick={logout}>
+              Sign out
+            </button>
+          </div>
+          {showClaims && (
+            <div className="result">
+              <p className="muted">
+                Everything Cognito put in your ID token — readable by anyone
+                holding it, forgeable by no one. The signature is the security.
+              </p>
+              <pre>{JSON.stringify(profile, null, 2)}</pre>
+              <p className="muted">
+                Tokens in this tab's sessionStorage:{' '}
+                <code>{loadTokens() ? 'access · id · refresh' : 'none'}</code>
+              </p>
+            </div>
+          )}
+        </section>
+      )}
     </main>
   );
 }

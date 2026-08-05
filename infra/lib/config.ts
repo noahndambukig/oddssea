@@ -51,6 +51,21 @@ export interface AppConfig {
    */
   subdomain?: string;
 
+  /**
+   * Subdomain for Cognito's hosted login pages: "auth" produces
+   * auth.oddssea.xyz. Only used when domainName is set; without a custom
+   * domain the login pages live on the prefix domain below.
+   */
+  authSubdomain: string;
+
+  /**
+   * Fallback Hosted UI domain prefix, used only when domainName is unset:
+   * https://<prefix>.auth.<region>.amazoncognito.com. GLOBALLY unique
+   * across all AWS accounts — if deployment fails saying the domain
+   * already exists, change this.
+   */
+  cognitoDomainPrefix: string;
+
   /** GitHub repo allowed to deploy via CI/CD. */
   github: {
     owner: string;
@@ -87,10 +102,16 @@ export const configs: Record<string, AppConfig> = {
 
     // Requires the Route53 hosted zone to exist and the registrar's
     // nameservers to point at it — verified 2026-08-03 (GoDaddy → the four
-    // awsdns servers). Set both to undefined to fall back to the CloudFront
-    // domain.
+    // awsdns servers). Set domainName to undefined to fall back to the
+    // CloudFront domain.
+    //
+    // The app serves from the APEX itself (no subdomain) — decided
+    // 2026-08-04, replacing the original dev.oddssea.xyz, which is retired
+    // and no longer resolves.
     domainName: 'oddssea.xyz',
-    subdomain: 'dev',
+    subdomain: undefined,
+    authSubdomain: 'auth',
+    cognitoDomainPrefix: 'oddssea-dev',
 
     github: {
       owner: 'noahndambukig',
@@ -114,7 +135,8 @@ export function getConfig(envName: string): AppConfig {
 }
 
 /**
- * The full hostname the app is served from, e.g. "dev.oddssea.xyz" — or
+ * The full hostname the app is served from — the apex "oddssea.xyz" when
+ * no subdomain is set — or
  * undefined when running on the CloudFront domain, in which case the URL is
  * only known after the distribution is created.
  */

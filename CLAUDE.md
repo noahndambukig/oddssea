@@ -136,7 +136,7 @@ requires a decision entry.
 | Launch game roster | Chosen — 7 games (`docs/decisions/0007`) — specs drafted, `docs/01-game/game-modes.md` |
 | Core game loop | Drafted — `docs/01-game/` (core-loop + tasks), awaiting review |
 | Platform + hosting | Agreed — web-first PWA on AWS, `docs/04-technical/` |
-| Deployment skeleton | **Increment A live** — dev.oddssea.xyz, keyless CI/CD proven; Increments B (login) and C (API) next; walkthrough in `infra/README.md` |
+| Deployment skeleton | **Increment A live** — oddssea.xyz, keyless CI/CD proven. **Increment B built** (Cognito login on auth.oddssea.xyz, PKCE, 18+ gate, `decisions/0017`) — **first deploy pending**; C (API) next; walkthrough in `infra/README.md` |
 | Data model | Drafted — `docs/04-technical/data-model.md` (`decisions/0015`), awaiting review |
 | Compliance | Agreed — no-real-money wall, v1 posture (`docs/06-risks/compliance.md`) |
 
