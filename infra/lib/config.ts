@@ -66,6 +66,13 @@ export interface AppConfig {
    */
   cognitoDomainPrefix: string;
 
+  /**
+   * Subdomain for the API: "api" produces api.oddssea.xyz. Only used when
+   * domainName is set; without a custom domain the API answers on its
+   * generated execute-api URL.
+   */
+  apiSubdomain: string;
+
   /** GitHub repo allowed to deploy via CI/CD. */
   github: {
     owner: string;
@@ -112,6 +119,7 @@ export const configs: Record<string, AppConfig> = {
     subdomain: undefined,
     authSubdomain: 'auth',
     cognitoDomainPrefix: 'oddssea-dev',
+    apiSubdomain: 'api',
 
     github: {
       owner: 'noahndambukig',

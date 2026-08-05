@@ -14,6 +14,8 @@ export interface RuntimeConfig {
   userPoolClientId: string;
   /** Base URL of the hosted login pages, e.g. https://auth.oddssea.xyz */
   cognitoDomain: string;
+  /** Base URL of the API, e.g. https://api.oddssea.xyz */
+  apiUrl: string;
 }
 
 let cached: RuntimeConfig | null = null;
@@ -47,6 +49,7 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
     userPoolId: import.meta.env.VITE_USER_POOL_ID ?? '',
     userPoolClientId: import.meta.env.VITE_USER_POOL_CLIENT_ID ?? '',
     cognitoDomain: import.meta.env.VITE_COGNITO_DOMAIN ?? '',
+    apiUrl: import.meta.env.VITE_API_URL ?? '',
   };
 
   const missing = Object.entries(fromEnv)

@@ -5,7 +5,8 @@
   "description": "oddssea — social-casino / gambling simulator. Specs in docs/, history in journal/.",
   "workspaces": [
     "web",
-    "infra"
+    "infra",
+    "api"
   ],
   "engines": {
     "node": ">=22"
