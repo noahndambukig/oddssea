@@ -158,12 +158,46 @@ async function refreshTokens(config: RuntimeConfig): Promise<boolean> {
 }
 
 /**
- * Step 5 — logout is two things. Clearing sessionStorage logs the APP out;
- * Cognito still holds a session cookie on the auth domain and would wave
- * the next login straight through. Navigating to /logout ends that too.
+ * Step 5 — logout is THREE things, each killing a different credential:
+ *
+ *   1. clearTokens()      logs the APP out — the browser holds nothing
+ *   2. /oauth2/revoke     kills the refresh token SERVER-SIDE — a copy of
+ *                         it exfiltrated before logout is now worthless
+ *   3. navigate /logout   ends Cognito's session cookie on the auth domain,
+ *                         which would otherwise wave the next login through
+ *
+ * Without step 2 the one-day refresh token outlives the sign-out — the
+ * infra enables revocation (enableTokenRevocation), but an endpoint nobody
+ * calls revokes nothing. Best-effort by design: sign-out must complete even
+ * if the network call fails, so the redirect is not blocked on it, and
+ * `keepalive` lets the request outlive the navigation it races against.
+ *
+ * What revocation does NOT do: un-issue the access token. The API's JWT
+ * authorizer verifies offline against cached public keys and never asks
+ * Cognito whether a token is still good, so an access token issued before
+ * logout stays accepted until its ≤1h expiry. That window is the trade
+ * stateless verification makes — revocation immediacy for zero-latency
+ * auth — and shrinking it is a problem for the BFF (decision 0017), not
+ * for this increment.
  */
 export function logout(config: RuntimeConfig): void {
+  const refreshToken = loadTokens()?.refreshToken;
   clearTokens();
+
+  if (refreshToken) {
+    fetch(`${config.cognitoDomain}/oauth2/revoke`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        token: refreshToken,
+        client_id: config.userPoolClientId, // public client: no secret to send
+      }),
+      keepalive: true,
+    }).catch(() => {
+      // Best-effort: the local tokens are already gone either way.
+    });
+  }
+
   const params = new URLSearchParams({
     client_id: config.userPoolClientId,
     logout_uri: window.location.origin,

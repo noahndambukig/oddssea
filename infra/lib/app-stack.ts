@@ -7,6 +7,7 @@ import { Construct } from 'constructs';
 import { AppConfig } from './config';
 import { Web } from './constructs/web';
 import { Auth } from './constructs/auth';
+import { Api } from './constructs/api';
 
 export interface AppStackProps extends cdk.StackProps {
   config: AppConfig;
@@ -42,6 +43,17 @@ export class AppStack extends cdk.Stack {
       config,
       appUrl: web.appUrl,
       apexRecord: web.apexRecord,
+    });
+
+    // The API — the gateway verifies Cognito's tokens offline, so it needs
+    // the issuer (where the public keys live) and the client ID (the
+    // audience a token must have been minted for). appUrl is the CORS
+    // origin, from the Web construct for the same reason Auth takes it.
+    const api = new Api(this, 'Api', {
+      config,
+      appUrl: web.appUrl,
+      issuerUrl: auth.issuerUrl,
+      userPoolClientId: auth.userPoolClient.userPoolClientId,
     });
 
     // One shared, finite log group for the BucketDeployments' singleton
@@ -103,6 +115,8 @@ export class AppStack extends cdk.Stack {
           userPoolId: auth.userPool.userPoolId,
           userPoolClientId: auth.userPoolClient.userPoolClientId,
           cognitoDomain: auth.loginBaseUrl,
+          // Increment C: where the browser sends API calls.
+          apiUrl: api.apiUrl,
         }),
       ],
       prune: false,
@@ -124,6 +138,11 @@ export class AppStack extends cdk.Stack {
     // publishes LAST — no Sign In button before the thing it points at
     // exists.
     rootDeployment.node.addDependency(auth.ready);
+
+    // Same race, new name: api.oddssea.xyz in config.json is also a
+    // computed constant (the raw execute-api URL would have been a real
+    // reference and ordered this for free). No API panel before the API.
+    rootDeployment.node.addDependency(api.ready);
 
     // ---- Outputs -------------------------------------------------------
     // Printed after every `cdk deploy`; readable any time with:
@@ -152,6 +171,14 @@ export class AppStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'IssuerUrl', {
       value: auth.issuerUrl,
       description: 'Append /.well-known/jwks.json to see the public signing keys',
+    });
+    new cdk.CfnOutput(this, 'ApiUrl', {
+      value: api.apiUrl,
+      description: 'Where the browser sends API calls',
+    });
+    new cdk.CfnOutput(this, 'ApiRawEndpoint', {
+      value: api.rawEndpoint,
+      description: 'The generated execute-api URL — proves the custom domain is routing, not serving',
     });
   }
 }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from './auth/AuthContext';
 import { AttestationGate } from './auth/AttestationGate';
 import { loadTokens } from './auth/token-store';
+import { ApiPanel } from './ApiPanel';
 
 export default function App() {
   const { status, config, error, profile, attestedAt, login, logout } = useAuth();
@@ -38,7 +39,7 @@ export default function App() {
       <header>
         <h1>oddssea</h1>
         <p className="muted">
-          Increment B — real accounts
+          Increment C — a token-guarded API
           {config?.environment ? ` · ${config.environment}` : ''}
         </p>
       </header>
@@ -110,6 +111,10 @@ export default function App() {
           )}
         </section>
       )}
+
+      {/* Both auth states, deliberately: signed out, the /me click dying at
+          the gateway is a demonstration, not an error. */}
+      <ApiPanel />
     </main>
   );
 }

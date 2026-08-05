@@ -496,7 +496,13 @@ VITE_REGION=us-east-1
 VITE_USER_POOL_ID=<UserPoolId output>
 VITE_USER_POOL_CLIENT_ID=<UserPoolClientId output>
 VITE_COGNITO_DOMAIN=<LoginBaseUrl output>
+VITE_API_URL=<ApiUrl output>            # from Increment C on
 ```
+
+The loader checks every field and names what is missing, so adding a new
+increment's variable is never silent: `npm run dev` breaks loudly until
+`.env.local` catches up. Local dev talks to the **deployed** API —
+`http://localhost:5173` is in its CORS allow-list for exactly this.
 
 `http://localhost:5173/callback` is already a registered callback URL, so
 local login works against the real user pool. Three checks worth running
@@ -506,6 +512,131 @@ double-run); a reload right after attesting does **not** reopen the gate
 (the forced token refresh landed the claim); and the session survives past
 the first hour (the refresh token was carried forward — the failure nothing
 else would catch).
+
+## Part 7 — Increment C: the API
+
+### The shape of it
+
+```
+browser ── GET /health ──────────────► API Gateway ──► Lambda ──► { ok: true }
+                                        (HTTP API)
+browser ── GET /me ──────────────────► API Gateway
+           Authorization: Bearer         │ JWT authorizer: signature (JWKS),
+           <access token>                │ issuer, audience, expiry, scope
+                                         │
+                              valid ─────┼────► Lambda ──► your claims
+                              invalid ───┴────► 401/403 — NO Lambda runs
+```
+
+This is the piece that closes the milestone's loop: a token minted by
+Cognito, **verified by something that is not Cognito**, gating something
+that is not the login page. The verifier is API Gateway itself — the
+**JWT authorizer** holds the pool's public keys (fetched once from the
+JWKS URL you can open in a browser) and checks every request's token
+before any code of ours runs. The Lambda behind it
+([../api/src/handler.ts](../api/src/handler.ts) — annotated like `pkce.ts`)
+contains **no verification code at all**; read it and notice what is
+missing. It answers on `https://api.oddssea.xyz` — the same
+cert + DNS pattern for the third time, plus one new piece (an **API
+mapping** binding the API to the domain).
+
+### Concepts before commands
+
+- **Verification is offline.** The gateway checks the signature against
+  cached public keys — it never calls Cognito per request. That is why a
+  rejected request costs nothing (no Lambda, no compute, nothing in the
+  log) and also why revoking a token does not un-issue it: an access token
+  stays accepted until its ≤1h expiry. Stateless verification trades
+  revocation immediacy for zero-latency auth; `docs/decisions/0017`'s BFF
+  is where that trade gets revisited before money exists.
+- **The scope loop, closed in three places.** `openid` is (1) enabled on
+  the app client, (2) requested by the browser at authorize time, and —
+  new here — (3) required on `/me`. Leg 3 is what actually keeps an ID
+  token out of the API: ID tokens carry no `scope` claim at all, so they
+  fail the requirement even though their signature, issuer and audience
+  all pass.
+- **401 vs 403.** 401 = "I don't know who you are" (no token, bad
+  signature, expired). 403 = "I know exactly who you are, and no" (valid
+  token, insufficient scope). An ID token at `/me` is the 403 case —
+  it *is* a valid token; it is just the wrong kind.
+- **The token contract.** The access token carries `sub`, `client_id`,
+  `token_use`, `scope` — and **no email**. Email lives on the ID token the
+  page already holds. `/me` answers from the access token; the page
+  renders email from the ID token. Two tokens, two jobs — the separation
+  is the lesson, not a workaround.
+- **CORS, and its documented sharp edge.** `Authorization` is not a
+  CORS-safelisted header, so `/me` triggers a preflight `OPTIONS` the
+  gateway answers itself. But the gateway adds CORS headers **only to
+  integration responses** — its own authorizer-generated 401/403 carries
+  none, so browser JS sees those as `TypeError: Failed to fetch`, never a
+  status. The page's API panel renders that block as the demonstration;
+  the numeric statuses live in the curl checks below.
+- **Logout is three things now.** Increment B's logout cleared local
+  tokens and ended Cognito's session cookie — but the infra's
+  `enableTokenRevocation` was an endpoint nobody called, so the one-day
+  refresh token outlived sign-out. `logout()` now also fires a
+  best-effort `POST /oauth2/revoke`, killing the refresh token
+  server-side. (What it cannot do: un-issue the access token — see the
+  first bullet.)
+- **A reference vs a constant.** The raw `execute-api` URL would have
+  been a CloudFormation *reference*, and the site upload would have been
+  ordered after the API for free through the dependency graph. The pretty
+  `api.oddssea.xyz` is a computed *constant* — no dependency edge — so the
+  ordering is declared by hand (`api.ready`), exactly like the login URL
+  in Increment B. Choosing a name turned out to be choosing a deployment
+  ordering.
+
+### Deploy it
+
+```bash
+npm run deploy
+```
+
+New in this run, in order: the `api.oddssea.xyz` certificate validating
+(fast — Route53 answers immediately; nothing like the Cognito domain's
+15–60 min), then the API, routes, Lambda, custom domain, mapping and DNS
+record — and the site republishing last, with `apiUrl` in `config.json`.
+
+### Console safari
+
+- **API Gateway → APIs → oddssea-dev:** open **Routes** — `GET /health`
+  bare, `GET /me` with the authorizer attached and `openid` under its
+  authorization scopes. Under **Authorization**, read the authorizer's
+  issuer and audience — these are exact-string checks against the token's
+  claims.
+- **Open the JWKS URL:** take the `IssuerUrl` output and append
+  `/.well-known/jwks.json` in a browser. These public keys are what the
+  gateway verifies signatures with — this file is the entire reason it
+  never has to call Cognito.
+- **Lambda → the handler:** see the bundled code (esbuild output — your
+  TypeScript, transpiled at synth time). Open **Monitor → Logs** and
+  start a live tail, then go click the API panel: `/health` and a
+  signed-in `/me` each write an invocation; a rejected `/me` writes
+  **nothing** — the absence is the observation.
+- **The API panel** on https://oddssea.xyz (both signed out and in): watch
+  devtools → Network while clicking `/me` — the preflight `OPTIONS` goes
+  out first, answered by the gateway; then the `GET` with the Bearer
+  header. The first click after a quiet spell is slower: a **cold
+  start** — AWS spinning up an execution environment for a function that
+  scaled to zero.
+
+### The curl checks (where the numeric statuses live)
+
+The browser cannot see the gateway's rejection statuses (the CORS bullet
+above), so prove them from the terminal. Grab tokens from devtools →
+Application → Session Storage → `oddssea.tokens` while signed in:
+
+```bash
+curl -i https://api.oddssea.xyz/health          # 200 {"ok":true}
+curl -i https://api.oddssea.xyz/me              # 401 — no token: unknown caller
+curl -i -H "Authorization: Bearer <idToken>" https://api.oddssea.xyz/me
+                                                # 403 — valid token, wrong kind:
+                                                # no scope claim → scope check fails
+curl -i -H "Authorization: Bearer <accessToken>" https://api.oddssea.xyz/me
+                                                # 200 — your claims
+curl -i <ApiRawEndpoint output>/health          # same body as the custom domain:
+                                                # the mapping routes, it doesn't serve
+```
 
 ## Failure modes worth recognising (Increment A)
 
@@ -537,6 +668,17 @@ else would catch).
 | Attestation write fails with "Access Token does not have required scopes" | The token was minted without `aws.cognito.signin.user.admin` | The authorize request must ask for it — check SCOPES in auth-client.ts; sign out and in to mint a fresh token |
 | The 18+ gate reappears after a reload | The stored ID token predates the attestation and lacks the claim | The gate forces a token refresh after writing; if it recurs, check forceRefresh ran and GetUser fallback is reachable |
 | `npm run dev` shows "Unexpected token '<', \"<!doctype \"... is not valid JSON" | The dev server answers *any* unmatched path with index.html and a **200**, so a missing `/config.json` arrives as HTML wearing a success status | `runtime-config.ts` checks the content type before parsing, then falls through to `web/.env.local`. If you see this, `.env.local` is missing or incomplete |
+
+## Failure modes worth recognising (Increment C)
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| The API panel says "blocked by CORS" on a signed-out `/me` | **Expected** — the gateway's 401 carries no CORS headers (they are added to integration responses only), so the browser hides the status entirely | Not a bug; the curl check shows the 401. If it happens *signed in*, the access token is being rejected — check the curl equivalent to see whether it is a 401 (bad/expired token) or 403 (scope) |
+| `/me` in curl returns 403 when you expected 401 | The token is *valid* but fails the scope requirement — the classic case is sending the **ID token**, which carries no `scope` claim | 401 = unknown caller, 403 = known but not allowed. Send the **access** token |
+| Browser console: CORS error naming the origin | The calling origin is not in the allow-list (`appUrl` + `http://localhost:5173`) — e.g. Vite came up on port 5174 because 5173 was taken | Free the port or add the origin; the allow-list is in `infra/lib/constructs/api.ts` |
+| First API call after a quiet spell takes ~a second; later ones are fast | **Cold start** — the function scaled to zero and AWS built a fresh execution environment for the first request | Normal at this scale. It matters at volume; provisioned concurrency is the (paid) fix, and nothing here needs it |
+| `{"message":"Not Found"}` with a 404 from the API | The path exists on no route (`/Health` ≠ `/health`), or the stage/routes are still creating on a first deploy | Check the path against the Routes console page; on first deploys the site publishes only after `api.ready`, so this should not be visible from the panel |
+| `{"message":"Unauthorized"}` in curl with a token you believe is fresh | The authorizer's checks are exact: wrong issuer (different pool), wrong audience (different app client), or the token expired mid-session | Decode the JWT at the payload (base64url) and compare `iss`/`client_id`/`exp` against the authorizer's configuration in the console |
 
 ---
 
@@ -583,3 +725,12 @@ Grows as terms first appear. Increment A's entries:
 | **IAM Identity Center** | AWS's human-login system: browser sign-in, temporary CLI credentials that expire in hours. Replaces IAM users with permanent access keys. |
 | **Permission set** | Identity Center's template for what an assigned user may do in an account (here: AdministratorAccess). |
 | **AWS Organization** | Management layer for multiple accounts. Auto-created by Identity Center; inert with one account. |
+| **Lambda** | Run-a-function-on-demand compute: no server to own, scales to zero, billed per invocation. The API's handler is one. |
+| **Cold start** | The latency of the *first* invocation after a function scaled to zero — AWS building a fresh execution environment. Later calls reuse it. |
+| **API Gateway / HTTP API** | The managed front door for APIs: routes, CORS, and auth checks before any code of yours runs. HTTP API (v2) is the cheaper, leaner generation used here. |
+| **JWT authorizer** | The gateway's built-in token checker: signature (against JWKS), issuer, audience, expiry, scopes — offline, per request, no Lambda involved in a rejection. |
+| **Integration** | The gateway's term for "what a route invokes" — here, one Lambda behind both routes. CORS headers are added to *integration* responses only, which is why authorizer rejections show as CORS blocks in a browser. |
+| **API mapping** | The binding between a custom domain and an API (+stage) — the piece that makes `api.oddssea.xyz` route to this API rather than serve anything itself. |
+| **Preflight** | The browser's permission-check `OPTIONS` request before a cross-origin call with non-safelisted headers (like `Authorization`). The gateway answers it directly. |
+| **Revocation** | Telling Cognito a refresh token is dead (`/oauth2/revoke`) — logout's third job. Cannot un-issue outstanding access tokens; offline verifiers accept them until expiry. |
+| **Resource server** | Cognito's mechanism for custom API scopes (`oddssea-api/read`…) — the shape this becomes when one protected route grows into many with different permissions. |
