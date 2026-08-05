@@ -156,7 +156,16 @@ function handler(event) {
       // nothing to query. Because this IS the apex, it also satisfies
       // Cognito's parent-must-resolve check for auth.oddssea.xyz — see the
       // apexRecord property doc above.
-      this.apexRecord = new route53.ARecord(this, 'AliasRecord', {
+      //
+      // The construct id is 'ApexRecord' — NOT a free choice. CloudFormation
+      // tracks resources by logical ID, and the deployed stack already owns
+      // oddssea.xyz under this id (WebApexRecord…) from when the apex was a
+      // redirect target. Keeping the id means CFN sees "unchanged" here and
+      // simply deletes the old dev record; renaming it reads as a
+      // replacement, whose create-before-delete collides with the existing
+      // record at the same name. That exact failure rolled back the first
+      // flip deploy.
+      this.apexRecord = new route53.ARecord(this, 'ApexRecord', {
         zone: hostedZone,
         recordName: config.subdomain,
         target: route53.RecordTarget.fromAlias(
