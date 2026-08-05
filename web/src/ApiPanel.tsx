@@ -14,13 +14,13 @@ import { getAccessToken } from './auth/auth-client';
  * first (watch for the OPTIONS request in devtools — API Gateway answers it
  * itself; no Lambda runs).
  *
- * The catch this panel exists to teach: when the gateway's JWT authorizer
- * REJECTS a request, its 401/403 carries no CORS headers — API Gateway only
- * adds them to responses from an integration, and a rejected request never
- * reached one. The browser therefore hides the response entirely and fetch
- * rejects with a TypeError. So a signed-out /me click renders the block
- * itself as the result; the numeric status lives in the curl checks, where
- * CORS does not exist.
+ * Rejections render normally. An HTTP API adds `access-control-allow-origin`
+ * to its OWN authorizer-generated 401/403 as well as to integration
+ * responses (verified against the deployed API — this is where HTTP APIs
+ * differ from REST APIs, where gateway responses need CORS wired up by
+ * hand). So a signed-out /me shows a real 401 here, and `fetch` only
+ * rejects on a genuine network failure — which is what the catch below is
+ * for.
  */
 
 interface CallResult {
@@ -29,7 +29,7 @@ interface CallResult {
   ms: number;
   status?: number;
   body?: unknown;
-  corsBlocked?: boolean;
+  networkError?: boolean;
 }
 
 export function ApiPanel() {
@@ -62,11 +62,10 @@ export function ApiPanel() {
       const body: unknown = await response.json().catch(() => null);
       setResult({ route, sentToken, ms, status: response.status, body });
     } catch {
-      // fetch rejecting here (TypeError) means the browser blocked the
-      // response — for this API, that is the authorizer rejection wearing
-      // its CORS disguise.
+      // fetch rejects only on a network-level failure — DNS, TLS, offline,
+      // or a CORS block. An HTTP status, including 401 and 403, resolves.
       const ms = Math.round(performance.now() - started);
-      setResult({ route, sentToken, ms, corsBlocked: true });
+      setResult({ route, sentToken, ms, networkError: true });
     } finally {
       setBusy(false);
     }
@@ -90,20 +89,12 @@ export function ApiPanel() {
       </div>
       {result && (
         <div className="result">
-          {result.corsBlocked ? (
-            <>
-              <p className="error-text">
-                <code>{result.route}</code> — blocked by CORS after{' '}
-                {result.ms} ms.
-              </p>
-              <p className="muted">
-                The gateway rejected this before any Lambda ran (the Lambda
-                log shows nothing). Rejections never reach the integration,
-                so they carry no CORS headers and the browser hides the
-                status. Run the curl check to see the number — 401 without a
-                token, 403 with an ID token.
-              </p>
-            </>
+          {result.networkError ? (
+            <p className="error-text">
+              <code>{result.route}</code> — the request never completed
+              ({result.ms} ms). Not an HTTP status: DNS, TLS, offline, or a
+              CORS block. Check the console and the Network tab.
+            </p>
           ) : (
             <>
               <p className="muted">
@@ -113,6 +104,21 @@ export function ApiPanel() {
                 <code>{result.status}</code> in {result.ms} ms
               </p>
               <pre>{JSON.stringify(result.body, null, 2)}</pre>
+              {result.status === 401 && (
+                <p className="muted">
+                  401 — the gateway does not know who you are. No Lambda ran:
+                  the log group has no entry for this request. That absence
+                  is the point of a gateway authorizer.
+                </p>
+              )}
+              {result.status === 403 && (
+                <p className="muted">
+                  403, not 401 — this token is <em>valid</em>. Same issuer,
+                  same signature, right audience. It fails only the{' '}
+                  <code>openid</code> scope requirement, which is what keeps
+                  an ID token out of a route that wants an access token.
+                </p>
+              )}
             </>
           )}
         </div>

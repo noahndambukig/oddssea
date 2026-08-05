@@ -564,13 +564,21 @@ mapping** binding the API to the domain).
   page already holds. `/me` answers from the access token; the page
   renders email from the ID token. Two tokens, two jobs — the separation
   is the lesson, not a workaround.
-- **CORS, and its documented sharp edge.** `Authorization` is not a
-  CORS-safelisted header, so `/me` triggers a preflight `OPTIONS` the
-  gateway answers itself. But the gateway adds CORS headers **only to
-  integration responses** — its own authorizer-generated 401/403 carries
-  none, so browser JS sees those as `TypeError: Failed to fetch`, never a
-  status. The page's API panel renders that block as the demonstration;
-  the numeric statuses live in the curl checks below.
+- **CORS, and a claim worth having checked.** `Authorization` is not a
+  CORS-safelisted header, so `/me` triggers a preflight `OPTIONS` — which
+  the gateway answers itself, returning `204` with the allow-list. The
+  review of this increment's plan asserted that rejections would then be
+  *invisible* to browser JS: AWS's own wording is that CORS headers are
+  added "to the response from an integration", and an authorizer-generated
+  401 never reaches one. Measured against the deployed API, that is
+  **false** — the 401 comes back with
+  `access-control-allow-origin: https://oddssea.xyz`, so the panel reads
+  the status normally. (It is correctly *absent* for an origin outside the
+  allow-list.) The advice is real but belongs to **REST APIs (v1)**, where
+  gateway responses genuinely need CORS wired up by hand; HTTP APIs (v2)
+  do it for you. Two lessons: version-check advice about AWS services, and
+  a documentation sentence about one case is not a statement about the
+  other.
 - **Logout is three things now.** Increment B's logout cleared local
   tokens and ended Cognito's session cookie — but the infra's
   `enableTokenRevocation` was an endpoint nobody called, so the one-day
@@ -613,18 +621,22 @@ record — and the site republishing last, with `apiUrl` in `config.json`.
   start a live tail, then go click the API panel: `/health` and a
   signed-in `/me` each write an invocation; a rejected `/me` writes
   **nothing** — the absence is the observation.
-- **The API panel** on https://oddssea.xyz (both signed out and in): watch
-  devtools → Network while clicking `/me` — the preflight `OPTIONS` goes
-  out first, answered by the gateway; then the `GET` with the Bearer
-  header. The first click after a quiet spell is slower: a **cold
-  start** — AWS spinning up an execution environment for a function that
-  scaled to zero.
+- **The API panel** on https://oddssea.xyz, with devtools → Network open.
+  Click `/me` **signed out**: one request, a real `401` rendered in the
+  panel — and the Lambda log tail stays silent for it. Click it **signed
+  in** and you get *two* requests: a preflight `OPTIONS` answered `204` by
+  the gateway, then the `GET`. The preflight appears only in the second
+  case, and that is the whole rule made visible — it is triggered by the
+  `Authorization` header, which exists only when you have a token. The
+  first click after a quiet spell is slower: a **cold start** — AWS
+  spinning up an execution environment for a function that scaled to zero.
 
-### The curl checks (where the numeric statuses live)
+### The curl checks
 
-The browser cannot see the gateway's rejection statuses (the CORS bullet
-above), so prove them from the terminal. Grab tokens from devtools →
-Application → Session Storage → `oddssea.tokens` while signed in:
+The panel covers the paths a browser can reach. curl covers the rest —
+sending a *deliberately wrong* token is not something the app will do for
+you. Grab tokens from devtools → Application → Session Storage →
+`oddssea.tokens` while signed in:
 
 ```bash
 curl -i https://api.oddssea.xyz/health          # 200 {"ok":true}
@@ -673,7 +685,7 @@ curl -i <ApiRawEndpoint output>/health          # same body as the custom domain
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| The API panel says "blocked by CORS" on a signed-out `/me` | **Expected** — the gateway's 401 carries no CORS headers (they are added to integration responses only), so the browser hides the status entirely | Not a bug; the curl check shows the 401. If it happens *signed in*, the access token is being rejected — check the curl equivalent to see whether it is a 401 (bad/expired token) or 403 (scope) |
+| The API panel says "the request never completed" instead of showing a status | A network-level failure, not an HTTP response: DNS, TLS, offline — or a genuine CORS block, which means the calling origin is not in the allow-list | Check the browser console; it names the CORS reason explicitly. A 401 or 403 is *not* this case — the gateway sends allow-origin on those, and the panel renders them |
 | `/me` in curl returns 403 when you expected 401 | The token is *valid* but fails the scope requirement — the classic case is sending the **ID token**, which carries no `scope` claim | 401 = unknown caller, 403 = known but not allowed. Send the **access** token |
 | Browser console: CORS error naming the origin | The calling origin is not in the allow-list (`appUrl` + `http://localhost:5173`) — e.g. Vite came up on port 5174 because 5173 was taken | Free the port or add the origin; the allow-list is in `infra/lib/constructs/api.ts` |
 | First API call after a quiet spell takes ~a second; later ones are fast | **Cold start** — the function scaled to zero and AWS built a fresh execution environment for the first request | Normal at this scale. It matters at volume; provisioned concurrency is the (paid) fix, and nothing here needs it |
@@ -729,7 +741,7 @@ Grows as terms first appear. Increment A's entries:
 | **Cold start** | The latency of the *first* invocation after a function scaled to zero — AWS building a fresh execution environment. Later calls reuse it. |
 | **API Gateway / HTTP API** | The managed front door for APIs: routes, CORS, and auth checks before any code of yours runs. HTTP API (v2) is the cheaper, leaner generation used here. |
 | **JWT authorizer** | The gateway's built-in token checker: signature (against JWKS), issuer, audience, expiry, scopes — offline, per request, no Lambda involved in a rejection. |
-| **Integration** | The gateway's term for "what a route invokes" — here, one Lambda behind both routes. CORS headers are added to *integration* responses only, which is why authorizer rejections show as CORS blocks in a browser. |
+| **Integration** | The gateway's term for "what a route invokes" — here, one Lambda behind both routes. |
 | **API mapping** | The binding between a custom domain and an API (+stage) — the piece that makes `api.oddssea.xyz` route to this API rather than serve anything itself. |
 | **Preflight** | The browser's permission-check `OPTIONS` request before a cross-origin call with non-safelisted headers (like `Authorization`). The gateway answers it directly. |
 | **Revocation** | Telling Cognito a refresh token is dead (`/oauth2/revoke`) — logout's third job. Cannot un-issue outstanding access tokens; offline verifiers accept them until expiry. |
