@@ -148,7 +148,7 @@ requires a decision entry.
 | Core game loop | Drafted — `docs/01-game/` (core-loop + tasks), awaiting review |
 | Platform + hosting | Agreed — web-first PWA on AWS, `docs/04-technical/` |
 | Deployment skeleton | **Complete — A, B and C all live and verified.** oddssea.xyz on keyless CI/CD; Cognito login on auth.oddssea.xyz with PKCE + 18+ gate (`decisions/0017`); api.oddssea.xyz serving `/health` and a JWT-guarded `/me` (401/403/200 all confirmed, rejections provably run no Lambda). Login-page branding deferred to late polish. Next milestone is the ledger — walkthrough in `infra/README.md` |
-| Data model | Drafted — `docs/04-technical/data-model.md` (`decisions/0015`), awaiting review |
+| Data model | **Agreed** — `docs/04-technical/data-model.md`; Pass 3 found 11 issues, 4 that would have shipped broken (`decisions/0015`, `0018`) |
 | Compliance | Agreed — no-real-money wall, v1 posture (`docs/06-risks/compliance.md`) |
 
 ## Context worth knowing
