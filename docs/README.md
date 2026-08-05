@@ -42,11 +42,11 @@ purpose: Index of every spec and its current state. Keep this current — it is 
 | `03-cosmetics/content/set-list.md` | Backlog — post-v1 seasonal concepts |
 | `04-technical/platform.md` | Agreed — implementation begun (`web/`) |
 | `04-technical/hosting.md` | Agreed — implementation begun (`infra/`) |
-| `04-technical/data-model.md` | Draft (`decisions/0015`) |
+| `04-technical/data-model.md` | Agreed — Pass 3 verified (`decisions/0015`, `0018`) |
 | `05-production/*` | Agreed — re-derived for gear families and the racer track |
 | `06-risks/compliance.md` | Agreed — v1 posture (no real-money path); legal review before monetisation or store submission |
 
 ## Suggested order for what's next
 
-1. Review the drafts (`01-game/core-loop`, `tasks`, `game-modes`, `racers`, `04-technical/data-model`) to `agreed`.
-2. First deploy, then build against the specs — every planned spec now exists and all content is chosen and shipped as data.
+1. Review the remaining drafts (`01-game/core-loop`, `tasks`, `game-modes`, `racers`) to `agreed` — Pass 3, as run on `data-model` on 2026-08-05, which found four issues that would have shipped broken.
+2. The deployment skeleton is live (`infra/README.md`); the ledger milestone builds against `data-model.md`, starting with the BFF that `decisions/0017` gates it behind.
