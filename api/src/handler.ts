@@ -94,8 +94,25 @@ export async function handler(
   const cookieHeader = (event.cookies ?? []).join('; ') || undefined;
   const origin = (event.headers ?? {})['origin'];
 
+  /**
+   * Route on the ACTUAL path, not `event.routeKey`.
+   *
+   * API Gateway reports routeKey as the pattern that was REGISTERED — for a
+   * proxy route that is literally `GET /auth/{proxy+}`, never
+   * `GET /auth/login`. Switching on routeKey therefore works for exact
+   * routes and silently falls through to the default for every proxy one,
+   * which is exactly what happened on the first deploy: /auth/login
+   * answered 400 instead of redirecting to Cognito.
+   *
+   * `rawPath` is what the caller actually asked for, so one key handles
+   * both kinds of route.
+   */
+  const method = event.requestContext.http.method;
+  const path = event.rawPath.replace(/\/+$/, '') || '/';
+  const route = `${method} ${path}`;
+
   try {
-    switch (event.routeKey) {
+    switch (route) {
       // ---------------------------------------------------------- public
       case 'GET /health':
         return toResult(json(200, { ok: true }));
@@ -184,7 +201,7 @@ export async function handler(
       }
 
       default:
-        return toResult(json(400, { error: `no_handler_for_${event.routeKey}` }));
+        return toResult(json(400, { error: `no_handler_for_${route}` }));
     }
   } catch (error) {
     // A resuming cluster is an expected state, not a failure. The client

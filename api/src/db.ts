@@ -171,8 +171,25 @@ export async function callFunction<T>(
   );
 
   const raw = rows[0]?.result;
-  if (raw === undefined || raw === null) return null as T;
-  return (typeof raw === 'string' ? JSON.parse(raw) : raw) as T;
+
+  /**
+   * The functions here return three different shapes, and the Data API
+   * hands all of them back as strings:
+   *
+   *   void         → '' (empty)          create_login_attempt, delete_session
+   *   scalar       → '550e8400-…'        upsert_player (uuid), set_attestation
+   *   jsonb        → '{"shells":50,…}'   claim_login_task, place_dice_bet
+   *
+   * Parsing unconditionally broke the first two: `JSON.parse('')` throws
+   * "Unexpected end of JSON input", and a bare UUID is not JSON either. So
+   * parse only what is actually JSON, and treat empty as null.
+   */
+  if (raw === undefined || raw === null || raw === '') return null as T;
+  if (typeof raw !== 'string') return raw as T;
+
+  const trimmed = raw.trim();
+  const looksLikeJson = trimmed.startsWith('{') || trimmed.startsWith('[');
+  return (looksLikeJson ? JSON.parse(trimmed) : raw) as T;
 }
 
 /**
