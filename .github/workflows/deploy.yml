@@ -75,7 +75,7 @@ jobs:
       # while the migration Lambda is allowed five minutes to wait out a
       # paused cluster.
       - name: Run migrations
-        run: bash scripts/run-migrations.sh Oddssea-dev-Data
+        run: node scripts/run-migrations.mjs Oddssea-dev-Data
 
       - name: Deploy app stack
         run: npx cdk deploy Oddssea-dev-App --require-approval never
