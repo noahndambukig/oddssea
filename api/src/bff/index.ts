@@ -254,7 +254,7 @@ export async function callback(
         // attestation claim, and must not erase the database's value.
         p_attested_at: (idClaims['custom:age_attested_at'] as string) ?? null,
       },
-      { transactionId },
+      { transactionId, casts: { p_attested_at: 'timestamptz' } },
     );
 
     return callFunction<string>(
@@ -265,7 +265,7 @@ export async function callback(
         p_refresh_token: tokens.refresh_token ?? '',
         p_expires_at: new Date(Date.now() + 86_400_000).toISOString(),
       },
-      { transactionId },
+      { transactionId, casts: { p_player_id: 'uuid', p_expires_at: 'timestamptz' } },
     );
   });
 
@@ -297,7 +297,7 @@ export async function refresh(
   let session: { player_id: string; cognito_sub: string; refresh_token: string };
   try {
     const rows = await query<typeof session>(
-      'SELECT * FROM read_session(:p_session_id)',
+      'SELECT * FROM read_session(:p_session_id::uuid)',
       { p_session_id: sessionId },
     );
     if (!rows.length) return json(401, { error: 'session_expired' });
@@ -331,7 +331,7 @@ export async function logout(
   const sessionId = parseCookies(cookieHeader)[SESSION_COOKIE];
   if (sessionId) {
     const rows = await query<{ refresh_token: string }>(
-      'SELECT * FROM read_session(:p_session_id)',
+      'SELECT * FROM read_session(:p_session_id::uuid)',
       { p_session_id: sessionId },
     ).catch(() => []);
 
@@ -350,7 +350,9 @@ export async function logout(
       }).catch(() => undefined);
     }
 
-    await callFunction('delete_session', { p_session_id: sessionId }).catch(() => undefined);
+    await callFunction('delete_session', { p_session_id: sessionId }, {
+      casts: { p_session_id: 'uuid' },
+    }).catch(() => undefined);
   }
 
   return { ...json(200, { ok: true }), cookies: [clearCookie(SESSION_COOKIE)] };

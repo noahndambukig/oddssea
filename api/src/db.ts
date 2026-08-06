@@ -160,10 +160,26 @@ export async function query<T = Record<string, unknown>>(
 export async function callFunction<T>(
   name: string,
   params: Record<string, Param>,
-  options: QueryOptions = {},
+  options: QueryOptions & { casts?: Record<string, string> } = {},
 ): Promise<T> {
   const names = Object.keys(params);
-  const args = names.map((n) => `:${n}`).join(', ');
+
+  /**
+   * Explicit casts, because the Data API has no idea what type it is sending.
+   *
+   * Every string parameter arrives as `text`. Postgres resolves which
+   * overload of a function to call using the ARGUMENT TYPES, and it will not
+   * implicitly cast text to uuid or timestamptz to make a match. So
+   * `upsert_player(text, text, timestamptz)` is simply invisible to a call
+   * passing three text values — the error is "function does not exist",
+   * which reads like the migration failed rather than like a type mismatch.
+   *
+   * Casting at the call site keeps the SQL functions strongly typed, which
+   * is what makes them reject nonsense at the boundary.
+   */
+  const args = names
+    .map((n) => (options.casts?.[n] ? `:${n}::${options.casts[n]}` : `:${n}`))
+    .join(', ');
   const rows = await query<Record<string, unknown>>(
     `SELECT ${name}(${args}) AS result`,
     params,

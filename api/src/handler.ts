@@ -65,11 +65,11 @@ async function currentPlayer(event: APIGatewayProxyEventV2WithJWTAuthorizer) {
 
   // Lazy provisioning: no Cognito trigger, no ordering race, and it works
   // for accounts that existed before this milestone.
-  const id = await callFunction<string>('upsert_player', {
-    p_sub: sub,
-    p_email: (claims.email as string) ?? null,
-    p_attested_at: null,
-  });
+  const id = await callFunction<string>(
+    'upsert_player',
+    { p_sub: sub, p_email: (claims.email as string) ?? null, p_attested_at: null },
+    { casts: { p_attested_at: 'timestamptz' } },
+  );
 
   return {
     id,
@@ -148,10 +148,11 @@ export async function handler(
         // The compliance gate is enforced HERE, not by the UI rendering a
         // screen. A client that skips the screen skips nothing.
         const player = await currentPlayer(event);
-        const attestedAt = await callFunction<string>('set_attestation', {
-          p_player_id: player.id,
-          p_at: new Date().toISOString(),
-        });
+        const attestedAt = await callFunction<string>(
+          'set_attestation',
+          { p_player_id: player.id, p_at: new Date().toISOString() },
+          { casts: { p_player_id: 'uuid', p_at: 'timestamptz' } },
+        );
         return toResult(json(200, { attestedAt }));
       }
 
@@ -160,10 +161,11 @@ export async function handler(
         const key = idempotencyKey(event);
         if (!key) return toResult(json(400, { error: 'idempotency_key_required' }));
         const player = await currentPlayer(event);
-        const result = await callFunction('claim_login_task', {
-          p_player_id: player.id,
-          p_idempotency_key: key,
-        });
+        const result = await callFunction(
+          'claim_login_task',
+          { p_player_id: player.id, p_idempotency_key: key },
+          { casts: { p_player_id: 'uuid' } },
+        );
         return toResult(json(200, result));
       }
 
@@ -196,7 +198,7 @@ export async function handler(
           p_roll: roll,
           p_roll_max: ROLL_MAX,
           p_content_version: CONTENT_VERSION,
-        });
+        }, { casts: { p_player_id: 'uuid' } });
         return toResult(json(200, result));
       }
 
