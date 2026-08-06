@@ -5,8 +5,11 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "synth": "cdk synth",
-    "diff": "cdk diff Oddssea-dev-App",
-    "deploy": "cdk deploy Oddssea-dev-App",
+    "diff": "cdk diff Oddssea-dev-Data Oddssea-dev-App",
+    "deploy:data": "cdk deploy Oddssea-dev-Data --require-approval never",
+    "deploy:app": "cdk deploy Oddssea-dev-App --require-approval never",
+    "migrate": "bash ../scripts/run-migrations.sh Oddssea-dev-Data",
+    "deploy": "npm run deploy:data && npm run migrate && npm run deploy:app",
     "deploy:cicd": "cdk deploy Oddssea-dev-Cicd",
     "bootstrap": "cdk bootstrap"
   },

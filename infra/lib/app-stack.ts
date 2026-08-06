@@ -2,7 +2,9 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as cdk from 'aws-cdk-lib';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as rds from 'aws-cdk-lib/aws-rds';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 import { AppConfig } from './config';
 import { Web } from './constructs/web';
@@ -11,6 +13,14 @@ import { Api } from './constructs/api';
 
 export interface AppStackProps extends cdk.StackProps {
   config: AppConfig;
+  /**
+   * The database, owned by the Data stack. Passed rather than looked up so
+   * CDK orders the two deploys and refuses to delete the data out from
+   * under the app.
+   */
+  cluster: rds.IDatabaseCluster;
+  /** Credentials for the restricted `oddssea_app` role — never the admin one. */
+  appSecret: secretsmanager.ISecret;
 }
 
 const WEB_DIST = path.join(__dirname, '../../web/dist');

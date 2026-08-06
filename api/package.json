@@ -8,5 +8,9 @@
   "devDependencies": {
     "@types/aws-lambda": "^8.10.145",
     "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@aws-sdk/client-rds-data": "^3.1104.0",
+    "@aws-sdk/client-secrets-manager": "^3.1104.0"
   }
 }
