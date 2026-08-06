@@ -61,7 +61,13 @@ export function GamePanel() {
       }),
     );
     if (result) {
-      applyMe({ ...me!, shells: result.shells, pearls: result.pearls, streak: result.streak });
+      applyMe({
+        ...me!,
+        shells: result.shells,
+        pearls: result.pearls,
+        streak: result.streak,
+        lastClaimDate: result.claimDate,
+      });
       setMessage(`Claimed ${result.claimed} Shells — day ${result.streak} of the streak.`);
     }
   }
@@ -180,6 +186,7 @@ export function GamePanel() {
 interface ClaimResult {
   claimed: number;
   streak: number;
+  claimDate: string;
   shells: number;
   pearls: number;
 }

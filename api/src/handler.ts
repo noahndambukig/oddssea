@@ -198,7 +198,18 @@ export async function handler(
           p_roll: roll,
           p_roll_max: ROLL_MAX,
           p_content_version: CONTENT_VERSION,
-        }, { casts: { p_player_id: 'uuid' } });
+        }, {
+          casts: {
+            p_player_id: 'uuid',
+            // The function declares these as `integer`. Every JS number goes
+            // out as longValue, which Postgres reads as bigint, and it will
+            // not implicitly NARROW bigint to integer when resolving an
+            // overload — so the strongly-typed function is invisible again.
+            p_threshold: 'integer',
+            p_roll: 'integer',
+            p_roll_max: 'integer',
+          },
+        });
         return toResult(json(200, result));
       }
 
