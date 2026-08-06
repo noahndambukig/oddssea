@@ -677,9 +677,140 @@ curl -i <ApiRawEndpoint output>/health          # same body as the custom domain
 | `redirect_mismatch` on the login page | The redirect_uri sent is not an exact-string match for a registered callback URL | Compare `web/src/auth/auth-client.ts` redirectUri() to the client's callback list — scheme, port and trailing slash all count |
 | Login page errors or renders unstyled ("branding style not found") | Managed Login requires a branding style per client | The stack creates one with defaults; redeploy if it was deleted, then restyle in the designer |
 | Tokens fail with `invalid_grant` at the token endpoint | The code was already spent (back button, double navigation), or the PKCE verifier is gone | Start a fresh login; the app consumes its verifier after one use by design |
-| Attestation write fails with "Access Token does not have required scopes" | The token was minted without `aws.cognito.signin.user.admin` | The authorize request must ask for it — check SCOPES in auth-client.ts; sign out and in to mint a fresh token |
-| The 18+ gate reappears after a reload | The stored ID token predates the attestation and lacks the claim | The gate forces a token refresh after writing; if it recurs, check forceRefresh ran and GetUser fallback is reachable |
+| Attestation write fails with "Access Token does not have required scopes" | The token was minted without `aws.cognito.signin.user.admin` | **Superseded by the ledger milestone** — attestation writes to Postgres via `POST /me/attest` and needs no Cognito scope at all |
+| The 18+ gate reappears after a reload | The stored ID token predates the attestation and lacks the claim | **Superseded by the ledger milestone** — attestation lives in `players.age_attested_at`, so there is no claim to wait for and no refresh to force |
 | `npm run dev` shows "Unexpected token '<', \"<!doctype \"... is not valid JSON" | The dev server answers *any* unmatched path with index.html and a **200**, so a missing `/config.json` arrives as HTML wearing a success status | `runtime-config.ts` checks the content type before parsing, then falls through to `web/.env.local`. If you see this, `.env.local` is missing or incomplete |
+
+## Part 8 — the ledger: the first thing you can lose
+
+### What changes
+
+Increments A–C proved a URL, an identity, and a token-guarded API — and
+**nothing in the system remembered anything.** `/me` read claims out of the
+token you handed it. Destroy the stack, redeploy, lose nothing.
+
+This is where that ends. A player has a **Shell balance that persists**, a
+task pays into it, a dice bet moves it, wagering mints **Pearls**, and every
+movement is a row in an append-only ledger. It is the first work in this
+project that a bug can destroy rather than merely interrupt — which is why
+almost everything below is about making mistakes structurally impossible
+rather than merely unlikely.
+
+```
+Cognito ──► /auth/login ──► BFF (server) ──► /auth/callback
+                                │  exchanges the code SERVER-SIDE
+                                ▼
+                        httpOnly cookie          the browser never
+                        (refresh token)          sees a token it can
+                                │                 store or leak
+                                ▼
+  browser ── access token in MEMORY ──► API ──► SECURITY DEFINER function
+                                                       │
+                                            ledger row + balance + assert
+```
+
+### Concepts before commands
+
+- **A backend-for-frontend.** `decisions/0017` gated this milestone on it:
+  tokens in `sessionStorage` were an honest trade when there was nothing to
+  steal, and a balance ends that trade. The refresh token now lives in an
+  `httpOnly` cookie the browser cannot read; the access token lives in a
+  JavaScript variable and dies on refresh. Check `document.cookie` when you
+  are signed in — it is empty.
+- **Scale to zero, and what it costs.** The database pauses after ten idle
+  minutes and bills nothing but storage. That single setting is why this
+  project costs pennies. The price is a **15-second resume, 30+ after a day
+  asleep**, on the first request. It cannot be waited out — HTTP APIs cap
+  integration timeout near 29 seconds and it is not increasable — so a cold
+  request returns `503` and the client retries. The waiting screen is the
+  design, not a failure.
+- **Idempotency is not atomicity.** A transaction is all-or-nothing for ONE
+  execution. It says nothing about the same request arriving twice, and over
+  a mobile network it will: a client that never hears back cannot distinguish
+  a lost request from a lost response. Every economic call carries an
+  `Idempotency-Key`, generated once per action and reused by every retry; the
+  server records it *in the same transaction as the money* and replays the
+  stored response.
+- **Least privilege in the database, not in the code.** The API connects as
+  `oddssea_app`, which has EXECUTE on a handful of functions and **no write
+  privilege on any table**. The functions are `SECURITY DEFINER`, so they
+  carry their owner's rights when they run. "The ledger is append-only" is
+  therefore not a rule the code follows — it is `permission denied`.
+- **Ordering the irreversible step last.** An OAuth code is single-use and
+  the database is usually asleep. So the callback warms the database, checks
+  the replay binding, and only then spends the code. Do the cheap reversible
+  work first; leave the one-way door until everything else has succeeded.
+
+### Before your first deploy
+
+**Redeploy the CI/CD stack.** It is the one stack deployed by hand, and it
+now needs permission to invoke the migration Lambda:
+
+```bash
+npm run deploy:cicd
+```
+
+### Deploy
+
+```bash
+npm run deploy
+```
+
+Three steps in order — data stack, migrations, app stack — because the app
+stack publishes the website *during* its own update, so there is no moment
+inside it in which to bring the schema forward first. Ordering had to become
+structural, which is why the database lives in its own stack.
+
+The Aurora cluster takes ~10 minutes the first time. The migration step
+prints which files it applied.
+
+### Console safari
+
+- **RDS → Databases → the cluster → Monitoring.** Watch
+  `ServerlessDatabaseCapacity`. Leave the site alone for fifteen minutes and
+  it drops to **0** — that is the cost model working, and the single most
+  satisfying graph in this project.
+- **RDS → Query editor.** Connect with the *admin* secret and look at
+  `ledger_entries`. Then try connecting with the **app** secret and running
+  `UPDATE ledger_entries SET amount = 0;` — permission denied.
+- **Secrets Manager.** Two secrets, both Retain. The database is Snapshot;
+  a snapshot whose password was deleted would be a backup nobody can open.
+- **CloudWatch → the migration log group.** Every applied file, in order.
+- **Devtools → Application → Cookies** while signed in: one `oddssea_session`
+  cookie marked `HttpOnly`. Then Storage → Session Storage: **empty**.
+
+### The adversarial checks — this is the deliverable
+
+The milestone is not done when dice works. It is done when you cannot break
+the invariants by trying.
+
+```bash
+# Replay an economic call with the SAME key -> one ledger row, same response
+KEY=$(uuidgen)
+curl -s -X POST https://api.oddssea.xyz/tasks/login-claim   -H "Authorization: Bearer $ACCESS" -H "Idempotency-Key: $KEY"
+curl -s -X POST https://api.oddssea.xyz/tasks/login-claim   -H "Authorization: Bearer $ACCESS" -H "Idempotency-Key: $KEY"   # identical body
+```
+
+| Check | What it proves |
+|---|---|
+| Replay a claim with the same `Idempotency-Key` → **one** ledger row, original response returned | Retrying is safe, which is what makes the cold-start protocol usable |
+| Two concurrent all-in bets → serialised, **balance never negative** | The player row lock and the non-negative CHECK. Not "one is rejected": if the first wins it may legitimately fund the second |
+| A winning dice bet writes **three** ledger rows (stake, payout, Pearls) | One currency and one kind per row |
+| Claim twice in one UTC day → refused; consecutive days → 50, 60, 70 … capped 100 | The economics, not just the plumbing |
+| `UPDATE ledger_entries` as `oddssea_app` → **permission denied**; `SELECT * FROM sessions` → **permission denied** | Append-only is enforced, and credential tables are unreadable |
+| Corrupt a cached balance inside a rollbackable admin transaction, then claim → the function `RAISE`s | Drift is prevented in the transaction that would have caused it, not detected afterwards |
+| An unattested player calling `/bets/dice` → rejected | Compliance is server-side, not a rendered gate |
+| `document.cookie` → **empty** | The session cookie is `HttpOnly` — not merely "the refresh token isn't there" |
+| Idle 15 minutes, then `ServerlessDatabaseCapacity` → **0** | Scale-to-zero engaged; the whole cost model |
+| Cold first request → waiting screen, then a working session | Both cold-start paths |
+| Billing → **no NAT gateway** | The most expensive trap in the milestone, avoided |
+
+### Running locally
+
+`web/.env.local` needs `VITE_API_URL`; the Vite dev server proxies `/auth` to
+the deployed API so the callback reaches the BFF rather than the SPA
+fallback. Without that proxy, "the browser never sees the code" would be true
+in production and false on your machine — the worst kind of difference.
 
 ## Failure modes worth recognising (Increment C)
 
@@ -691,6 +822,23 @@ curl -i <ApiRawEndpoint output>/health          # same body as the custom domain
 | First API call after a quiet spell takes ~a second; later ones are fast | **Cold start** — the function scaled to zero and AWS built a fresh execution environment for the first request | Normal at this scale. It matters at volume; provisioned concurrency is the (paid) fix, and nothing here needs it |
 | `{"message":"Not Found"}` with a 404 from the API | The path exists on no route (`/Health` ≠ `/health`), or the stage/routes are still creating on a first deploy | Check the path against the Routes console page; on first deploys the site publishes only after `api.ready`, so this should not be visible from the panel |
 | `{"message":"Unauthorized"}` in curl with a token you believe is fresh | The authorizer's checks are exact: wrong issuer (different pool), wrong audience (different app client), or the token expired mid-session | Decode the JWT at the payload (base64url) and compare `iss`/`client_id`/`exp` against the authorizer's configuration in the console |
+
+
+## Failure modes worth recognising (the ledger)
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Everything is slow for ~15s, then fine — and it happens again the next morning | **Working as designed.** The cluster paused after ten idle minutes. A resume is ~15s, or 30s+ if it slept over 24 hours | Nothing. The waiting screen exists for this. If it is *never* fast, check whether something is holding a connection open |
+| `ServerlessDatabaseCapacity` never reaches 0 | Something is holding a connection: RDS Proxy (not used here, deliberately), a scheduled job, or **a `psql`/query-editor session you left open** | Close it. AWS lists the blockers under "Situations where Aurora serverless doesn't auto-pause"; the failure is silent and costs money |
+| A bill appears that dwarfs everything else | A NAT gateway. The CDK default for `ec2.Vpc` is **one per availability zone**, ~$32/mo each | `natGateways: 0` in `data-stack.ts`. The Lambdas never enter the VPC — they use the Data API — so zero is correct, not a compromise |
+| CI synth fails: "Need to perform AWS calls … no credentials" | A construct is doing a **context lookup**. CI synthesises without credentials by design | Either cache it in `cdk.context.json` (as the hosted zone is) or remove the lookup — `DataStack` overrides `availabilityZones` for exactly this reason |
+| `aws lambda invoke` succeeded but nothing was migrated | The CLI **exits 0 when the function throws** — the API call worked, the function did not | `scripts/run-migrations.sh` checks `FunctionError` and the payload. Never trust the exit code alone |
+| Migration fails: "has changed since it was applied" | An already-applied `.sql` file was edited. Applied migrations are history | Add a NEW migration. If the diff is only line endings, check `.gitattributes` still pins `*.sql` to LF |
+| `permission denied for table ledger_entries` | **Working as designed** if it came from the API — `oddssea_app` has EXECUTE and no table writes | If it came from a *function*, that function is missing `SECURITY DEFINER` or its `GRANT EXECUTE` in `004` |
+| `balance drift for player …` | The cached balance disagreed with the ledger sum, and the function refused rather than proceeding | This should be impossible through the API. It means someone wrote the table directly — investigate before clearing it |
+| A minimum-stake bet awards 0 Pearls | Expected for a *single* bet: the award is 0.225 Pearls at stake 10. It accumulates in `players.pearls_fraction` and pays out as whole Pearls | Nothing. `pearlsPending` in the response shows the carry. Flooring per bet would lose it entirely — that bug is why the column exists |
+| Local login redirects but the app never signs in | The Vite `/auth` proxy is missing or `VITE_API_URL` is unset, so the callback hit the SPA fallback instead of the BFF | Set `VITE_API_URL` in `web/.env.local` and restart Vite |
+| `redirect_mismatch` after moving to the BFF | Cognito matches `redirect_uri` as a **whole string**, and the BFF registers `/auth/callback` — not an origin | Check the allow-list in `api/src/bff/index.ts` against the client's callback URLs |
 
 ---
 
@@ -745,4 +893,16 @@ Grows as terms first appear. Increment A's entries:
 | **API mapping** | The binding between a custom domain and an API (+stage) — the piece that makes `api.oddssea.xyz` route to this API rather than serve anything itself. |
 | **Preflight** | The browser's permission-check `OPTIONS` request before a cross-origin call with non-safelisted headers (like `Authorization`). The gateway answers it directly. |
 | **Revocation** | Telling Cognito a refresh token is dead (`/oauth2/revoke`) — logout's third job. Cannot un-issue outstanding access tokens; offline verifiers accept them until expiry. |
+| **Backend-for-frontend (BFF)** | A server that owns the OAuth exchange and holds the refresh token, so the browser never stores a credential it could leak. |
+| **`httpOnly` cookie** | A cookie JavaScript cannot read at all. The only browser storage an XSS payload cannot exfiltrate. |
+| **`SameSite`** | Controls whether a cookie rides along on cross-site requests. `Lax` is meaningful here only because CloudFront makes the BFF same-origin with the app. |
+| **RDS Data API** | Talking to Postgres over signed HTTPS instead of a connection. No pool, no VPC — and, decisively, nothing held open to prevent the cluster pausing. |
+| **Scale to zero / auto-pause** | Aurora Serverless v2 at minimum capacity 0: an idle cluster stops and bills only storage. Resumes in ~15s. |
+| **Migration** | An ordered, one-time schema change, recorded with a checksum. Applied migrations are history: you add, never edit. |
+| **Advisory lock** | A Postgres lock on an arbitrary number rather than a row — here, so two migration runners cannot apply the same file. Must be *transaction*-scoped over the Data API, which has no session affinity. |
+| **`SECURITY DEFINER`** | A function that runs with its owner's privileges rather than the caller's. Privilege delegation, narrowed to one operation — how the API writes a ledger it cannot touch. |
+| **`SELECT … FOR UPDATE`** | A pessimistic row lock: one player's economic events serialise, so concurrent bets cannot both spend the same balance. |
+| **Idempotency key** | A client-generated identifier making a repeated request harmless. Distinct from atomicity, which only covers a single execution. |
+| **UUIDv7** | A time-ordered UUID. Keys sort by creation time, so an append-heavy ledger writes to the end of its index instead of scattering across it. |
+| **Quantisation carry** | Accumulating a fractional remainder so repeated rounding loses nothing — why a 0.225-Pearl award is not simply floored away. |
 | **Resource server** | Cognito's mechanism for custom API scopes (`oddssea-api/read`…) — the shape this becomes when one protected route grows into many with different permissions. |
