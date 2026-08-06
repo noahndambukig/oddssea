@@ -2,7 +2,9 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as cdk from 'aws-cdk-lib';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as rds from 'aws-cdk-lib/aws-rds';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 import { AppConfig } from './config';
 import { Web } from './constructs/web';
@@ -11,6 +13,14 @@ import { Api } from './constructs/api';
 
 export interface AppStackProps extends cdk.StackProps {
   config: AppConfig;
+  /**
+   * The database, owned by the Data stack. Passed rather than looked up so
+   * CDK orders the two deploys and refuses to delete the data out from
+   * under the app.
+   */
+  cluster: rds.IDatabaseCluster;
+  /** Credentials for the restricted `oddssea_app` role — never the admin one. */
+  appSecret: secretsmanager.ISecret;
 }
 
 const WEB_DIST = path.join(__dirname, '../../web/dist');
@@ -53,8 +63,22 @@ export class AppStack extends cdk.Stack {
       config,
       appUrl: web.appUrl,
       issuerUrl: auth.issuerUrl,
-      userPoolClientId: auth.userPoolClient.userPoolClientId,
+      // The authorizer's audience is the BFF client, not the old public
+      // one. That switch is what invalidates the legacy sessionStorage
+      // tokens still held by any tab open across the deploy — an audience
+      // check rather than a waiting period.
+      userPoolClientId: auth.bffClient.userPoolClientId,
+      cluster: props.cluster,
+      appSecret: props.appSecret,
+      cognitoDomain: auth.loginBaseUrl,
+      bffClientId: auth.bffClient.userPoolClientId,
+      bffClientSecret: auth.bffClientSecret,
     });
+
+    // Route /auth/* on the app's own origin to the API, so the BFF's
+    // session cookie is first-party. Attached here rather than inside Web
+    // because it needs the API's hostname.
+    web.addAuthBehaviour(api.apiUrl, web.redirectFunction);
 
     // One shared, finite log group for the BucketDeployments' singleton
     // helper Lambda. Deliberately NOT the logRetention prop: that legacy
@@ -113,7 +137,7 @@ export class AppStack extends cdk.Stack {
           // Increment B: everything the browser needs to run the login
           // flow — none of it known until CloudFormation creates it.
           userPoolId: auth.userPool.userPoolId,
-          userPoolClientId: auth.userPoolClient.userPoolClientId,
+          userPoolClientId: auth.bffClient.userPoolClientId,
           cognitoDomain: auth.loginBaseUrl,
           // Increment C: where the browser sends API calls.
           apiUrl: api.apiUrl,
@@ -167,6 +191,11 @@ export class AppStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'UserPoolId', { value: auth.userPool.userPoolId });
     new cdk.CfnOutput(this, 'UserPoolClientId', {
       value: auth.userPoolClient.userPoolClientId,
+      description: 'The legacy public client — retired once nothing uses it',
+    });
+    new cdk.CfnOutput(this, 'BffClientId', {
+      value: auth.bffClient.userPoolClientId,
+      description: 'Confidential client; the JWT authorizer audience',
     });
     new cdk.CfnOutput(this, 'IssuerUrl', {
       value: auth.issuerUrl,

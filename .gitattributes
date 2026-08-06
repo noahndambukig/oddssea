@@ -1,0 +1,14 @@
+# Migration files are content-hashed by api/src/migrate.ts, and the hash is
+# stored in schema_migrations to detect edits to already-applied migrations.
+#
+# This repo runs with core.autocrlf=true and no other line-ending policy, so
+# `git ls-files --eol` reports `i/lf w/crlf`: files are LF in the index and
+# CRLF in a Windows worktree. Ubuntu CI checks out LF. Without this, a hash
+# computed locally could never match one computed in the pipeline, and the
+# integrity check would reject every unchanged migration on the first deploy
+# after a local one.
+#
+# The runner ALSO normalises line endings before hashing. Belt and braces:
+# this keeps the bytes consistent, that survives anyone cloning with a
+# different git configuration.
+*.sql text eol=lf

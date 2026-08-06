@@ -3,6 +3,7 @@ import * as cdk from 'aws-cdk-lib';
 import { getConfig } from '../lib/config';
 import { AppStack } from '../lib/app-stack';
 import { CicdStack } from '../lib/cicd-stack';
+import { DataStack } from '../lib/data-stack';
 
 const app = new cdk.App();
 
@@ -42,13 +43,36 @@ new CicdStack(app, `Oddssea-${config.envName}-Cicd`, {
 });
 
 /**
- * The application. This is what CI/CD redeploys on every merge to main.
+ * The database, and the migration runner that shapes it.
+ *
+ * Deployed BEFORE the app stack, with migrations run in between — the app
+ * stack publishes the website during its own update, so there is no window
+ * inside it in which the schema could be brought forward first. Separate
+ * stacks make the ordering structural rather than hopeful.
+ *
+ * It is also the stack you never destroy: SNAPSHOT on the cluster, RETAIN on
+ * both secrets.
  */
-new AppStack(app, `Oddssea-${config.envName}-App`, {
+const data = new DataStack(app, `Oddssea-${config.envName}-Data`, {
   env,
   config,
-  description: 'oddssea application: static site behind CloudFront',
+  description: 'oddssea data: Aurora Serverless v2 (scale-to-zero) and migrations',
 });
+
+/**
+ * The application. This is what CI/CD redeploys on every merge to main.
+ */
+const appStack = new AppStack(app, `Oddssea-${config.envName}-App`, {
+  env,
+  config,
+  cluster: data.cluster,
+  appSecret: data.appSecret,
+  description: 'oddssea application: static site, auth and API',
+});
+
+// The app reads the database the data stack owns. Declared so CDK orders the
+// two correctly and refuses to delete the data stack out from under it.
+appStack.addStackDependency(data);
 
 // Stamped onto every resource both stacks create — visible in the console
 // and usable for cost breakdowns later.

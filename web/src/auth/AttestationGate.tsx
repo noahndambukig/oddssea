@@ -1,56 +1,53 @@
 import { useState } from 'react';
-import { useAuth } from './AuthContext';
-import { forceRefresh, getAccessToken } from './auth-client';
-import { writeAttestedAt } from './user-api';
+import { useAuth, type Me } from './AuthContext';
+import { call } from '../api-client';
 
 /**
- * The 18+ attestation gate — docs/06-risks/compliance.md requires this
- * "from day one on the web", and docs/decisions/0017 records the interim
- * storage (a Cognito custom attribute, migrating to the players table when
- * the database exists).
+ * The 18+ gate — blocking, once, before anything else renders.
  *
- * Renders INSTEAD of the app for any authenticated, un-attested user.
- * On confirm: write the timestamp, then FORCE a token refresh — the stored
- * ID token was minted before the write and never gains the claim on its
- * own, so without the refresh a page reload within the hour would reopen
- * this gate for a user who already passed it.
+ * What the ledger changed: this writes to POSTGRES now, via POST /me/attest,
+ * not to a Cognito custom attribute. Two consequences worth understanding:
+ *
+ *   THE GATE IS NO LONGER THE ENFORCEMENT. Every economic route checks
+ *   players.age_attested_at server-side and rejects an unattested player. A
+ *   client that skips this screen now skips nothing — which is what
+ *   compliance.md actually asks for, and what a rendered gate alone never
+ *   provided.
+ *
+ *   NO TOKEN REFRESH IS NEEDED AFTERWARDS. The old flow wrote a custom
+ *   attribute and then had to force a fresh ID token to see it, because
+ *   claims are baked in when a token is minted. A database row has no such
+ *   problem: the next read simply reads.
  */
 export function AttestationGate() {
-  const { config, markAttested, logout } = useAuth();
+  const { config, applyMe, logout } = useAuth();
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function confirm() {
+  async function submit() {
     if (!config) return;
     setBusy(true);
     setError(null);
     try {
-      const accessToken = await getAccessToken(config);
-      if (!accessToken) throw new Error('Session expired — sign in again.');
-      const now = new Date().toISOString();
-      await writeAttestedAt(config, accessToken, now);
-      // Mint tokens that carry the new claim; the invariant in
-      // auth-client.ts keeps the refresh token itself intact.
-      await forceRefresh(config);
-      markAttested(now);
+      await call<{ attestedAt: string }>(config, '/me/attest', { method: 'POST' });
+      applyMe(await call<Me>(config, '/me'));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+    } finally {
       setBusy(false);
     }
   }
 
   return (
     <main className="shell">
-      <header>
-        <h1>oddssea</h1>
-      </header>
+      <h1>oddssea</h1>
       <section className="panel">
         <h2>Before you enter</h2>
         <p>
-          oddssea is a <strong>gambling simulator</strong>. Nothing here is
-          real money and nothing can be cashed out — but the games are games
-          of chance, and this site is intended for adults.
+          oddssea is a <strong>gambling simulator</strong>. Nothing here is real
+          money and nothing can be cashed out — but the games are games of
+          chance, and this site is intended for adults.
         </p>
         <label className="attest">
           <input
@@ -62,10 +59,10 @@ export function AttestationGate() {
         </label>
         {error && <p className="error-text">{error}</p>}
         <div className="actions">
-          <button disabled={!checked || busy} onClick={() => void confirm()}>
+          <button onClick={submit} disabled={!checked || busy}>
             {busy ? 'Saving…' : 'Continue'}
           </button>
-          <button className="secondary" disabled={busy} onClick={logout}>
+          <button className="secondary" onClick={logout}>
             Sign out
           </button>
         </div>

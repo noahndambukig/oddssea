@@ -24,6 +24,8 @@ export interface WebProps {
 export class Web extends Construct {
   readonly bucket: s3.Bucket;
   readonly distribution: cloudfront.Distribution;
+  /** The canonical-host redirect, so added behaviours can reattach it. */
+  readonly redirectFunction?: cloudfront.Function;
 
   /** The origin the browser loads the app from, e.g. https://oddssea.xyz */
   readonly appUrl: string;
@@ -36,6 +38,54 @@ export class Web extends Construct {
    * construct takes this and declares the dependency explicitly.
    */
   readonly apexRecord?: route53.ARecord;
+
+  /**
+   * Route /auth/* to the API, so the BFF answers on the app's OWN origin.
+   *
+   * That is what makes the session cookie first-party: SameSite=Lax then
+   * means something, and no CORS-with-credentials dance is needed. Called
+   * from app-stack once the Api construct exists, because a behaviour needs
+   * the API's hostname.
+   *
+   * THREE THINGS ADDITIONAL BEHAVIOURS DO NOT INHERIT from the default one,
+   * each of which breaks the login flow if omitted:
+   *
+   *   viewerProtocolPolicy  defaults to ALLOW_ALL, so /auth/* would answer
+   *                         over plain HTTP — and a `Secure` cookie is
+   *                         simply not set on an insecure response.
+   *   functionAssociations  the canonical-host redirect would not run, so
+   *                         the login flow could be served from the
+   *                         generated cloudfront.net name, where the cookie
+   *                         belongs to a different origin.
+   *   caching/forwarding    the default policy caches and strips almost
+   *                         everything; the callback needs `code` and
+   *                         `state` from the query string, the cookies, and
+   *                         the Origin header for the unsafe-request checks.
+   */
+  addAuthBehaviour(apiUrl: string, redirectFunction?: cloudfront.Function): void {
+    const apiHost = apiUrl.replace(/^https?:\/\//, '');
+
+    this.distribution.addBehavior('/auth/*', new origins.HttpOrigin(apiHost), {
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+      cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+      originRequestPolicy: new cloudfront.OriginRequestPolicy(this, 'AuthOriginPolicy', {
+        queryStringBehavior: cloudfront.OriginRequestQueryStringBehavior.all(),
+        cookieBehavior: cloudfront.OriginRequestCookieBehavior.all(),
+        // Not `all()`: forwarding Host would send the CloudFront hostname to
+        // API Gateway, which rejects it. An explicit list avoids that.
+        headerBehavior: cloudfront.OriginRequestHeaderBehavior.allowList(
+          'Origin',
+          'Referer',
+          'Accept',
+          'Content-Type',
+        ),
+      }),
+      functionAssociations: redirectFunction
+        ? [{ function: redirectFunction, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST }]
+        : undefined,
+    });
+  }
 
   constructor(scope: Construct, id: string, props: WebProps) {
     super(scope, id);
@@ -113,6 +163,8 @@ function handler(event) {
 }`),
           })
         : undefined;
+
+    this.redirectFunction = redirectFunction;
 
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultRootObject: 'index.html',

@@ -127,10 +127,22 @@ button:focus-visible {
   cursor: pointer;
 }
 
-.attest input {
+.attest input[type='checkbox'] {
   width: 1.25rem;
   height: 1.25rem;
   accent-color: var(--accent);
+}
+
+/* Number fields are not checkboxes — they need room for their value. */
+.attest input[type='number'] {
+  width: 6rem;
+  min-height: 44px;
+  padding: 0 0.625rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text);
+  font: inherit;
 }
 
 .error-text {

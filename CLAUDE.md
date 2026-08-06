@@ -152,7 +152,8 @@ requires a decision entry.
 | Launch game roster | **Agreed** — 7 games (`docs/decisions/0007`), Pass 3 verified (`docs/decisions/0019`) |
 | Core game loop | **Agreed** — `docs/01-game/` (core-loop, tasks, game-modes, racers) all Pass 3 verified (`docs/decisions/0019`) |
 | Platform + hosting | Agreed — web-first PWA on AWS, `docs/04-technical/` |
-| Deployment skeleton | **Complete — A, B and C all live and verified.** oddssea.xyz on keyless CI/CD; Cognito login on auth.oddssea.xyz with PKCE + 18+ gate (`decisions/0017`); api.oddssea.xyz serving `/health` and a JWT-guarded `/me` (401/403/200 all confirmed, rejections provably run no Lambda). Login-page branding deferred to late polish. Next milestone is the ledger — walkthrough in `infra/README.md` |
+| Deployment skeleton | **Complete — A, B and C live and verified.** oddssea.xyz on keyless CI/CD; Cognito login on auth.oddssea.xyz; api.oddssea.xyz with a JWT-guarded API. Branding deferred to late polish |
+| Ledger milestone | **Built, first deploy pending** — Aurora Serverless v2 (scale-to-zero, Data API), a backend-for-frontend, migrations, and the first real Shell/Pearl balances behind `SECURITY DEFINER` functions (`decisions/0020`, `0021`). Plan survived 9 Codex rounds / 62 findings; walkthrough Part 8 in `infra/README.md` |
 | Data model | **Agreed** — `docs/04-technical/data-model.md`; Pass 3 found 11 issues, 4 that would have shipped broken (`decisions/0015`, `0018`) |
 | Compliance | Agreed — no-real-money wall, v1 posture (`docs/06-risks/compliance.md`) |
 

@@ -22,9 +22,19 @@ code, `referred_by`, referral-payout state. Cached `shells_balance` and
 of truth. Both balances carry a **non-negative CHECK constraint** — the
 backstop that makes an overdraft impossible rather than unlikely.
 
-The Cognito subject is the join to identity; `age_attested_at` starts
-life as a Cognito custom attribute (Increment B) and migrates to this
-row when the table exists.
+The Cognito subject is the join to identity. **`age_attested_at` now
+lives here and is authoritative** — the migration this file anticipated
+is done (`decisions/0021`); Cognito's custom attribute survives only as a
+backfill-only import at first login, and every economic route rejects a
+player whose value is null.
+
+`players` also carries **`pearls_fraction`**, an accumulator rather than
+currency. The Pearl award formula (`../02-economy/currency-model.md`)
+yields a fraction of a Pearl at the minimum stake, and the ledger stores
+integers — so fractions accumulate here and whole Pearls enter the ledger
+when the carry crosses 1. Flooring each award instead would pay a
+minimum-stake player nothing at all (`decisions/0021`). It sits outside
+the ledger and outside the balance assertion because it is not money yet.
 
 ## The ledger
 
