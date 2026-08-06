@@ -121,6 +121,8 @@ export class Api extends Construct {
         DATABASE_NAME: 'oddssea',
         COGNITO_DOMAIN: cognitoDomain,
         BFF_CLIENT_ID: bffClientId,
+        // The ARN, not the value — see api/src/bff/index.ts.
+        BFF_CLIENT_SECRET_ARN: bffClientSecret.secretArn,
         APP_URL: appUrl,
       },
     });

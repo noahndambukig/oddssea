@@ -42,8 +42,37 @@ import {
 
 const COGNITO_DOMAIN = process.env.COGNITO_DOMAIN!;
 const CLIENT_ID = process.env.BFF_CLIENT_ID!;
-const CLIENT_SECRET = process.env.BFF_CLIENT_SECRET!;
+const CLIENT_SECRET_ARN = process.env.BFF_CLIENT_SECRET_ARN!;
 const APP_URL = process.env.APP_URL!;
+
+/**
+ * The client secret is FETCHED at runtime, never passed as an environment
+ * variable.
+ *
+ * Lambda environment variables are visible in the console, in
+ * `GetFunctionConfiguration`, and in the CloudFormation template — so a
+ * secret placed there is a secret shared with anyone holding read access to
+ * the account's infrastructure. Secrets Manager keeps it behind its own
+ * permission, and the Lambda's role grants read on this one secret alone.
+ *
+ * Cached at module scope: Lambda reuses a warm execution environment across
+ * invocations, so this is one call per cold start rather than one per
+ * request.
+ */
+let cachedSecret: string | null = null;
+
+async function clientSecret(): Promise<string> {
+  if (cachedSecret) return cachedSecret;
+  const { SecretsManagerClient, GetSecretValueCommand } = await import(
+    '@aws-sdk/client-secrets-manager'
+  );
+  const client = new SecretsManagerClient({});
+  const result = await client.send(
+    new GetSecretValueCommand({ SecretId: CLIENT_SECRET_ARN }),
+  );
+  cachedSecret = result.SecretString!;
+  return cachedSecret;
+}
 
 const SESSION_COOKIE = 'oddssea_session';
 const BINDING_COOKIE = 'oddssea_login';
@@ -78,7 +107,7 @@ interface TokenResponse {
  * this client at all.
  */
 async function tokenRequest(body: Record<string, string>): Promise<TokenResponse> {
-  const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
+  const credentials = Buffer.from(`${CLIENT_ID}:${await clientSecret()}`).toString('base64');
   const response = await fetch(`${COGNITO_DOMAIN}/oauth2/token`, {
     method: 'POST',
     headers: {
@@ -310,7 +339,7 @@ export async function logout(
     // refresh token outlives the sign-out, which is the gap Increment C
     // found and fixed in the old client.
     if (rows[0]?.refresh_token) {
-      const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
+      const credentials = Buffer.from(`${CLIENT_ID}:${await clientSecret()}`).toString('base64');
       await fetch(`${COGNITO_DOMAIN}/oauth2/revoke`, {
         method: 'POST',
         headers: {
