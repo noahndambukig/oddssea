@@ -57,11 +57,27 @@ jobs:
       - name: Who am I
         run: aws sts get-caller-identity
 
+      # Three steps, in this order, because the schema must be ahead of the
+      # code that uses it — and the app stack publishes the website DURING
+      # its own update, so there is no window inside it to migrate first.
+      #
       # --require-approval never: locally, CDK pauses to show you IAM and
       # security-group changes before applying them — leave that on and read
       # it. In CI there is nobody to answer the prompt, so it is disabled
       # and the review happens in the pull request instead.
-      - name: Deploy
+      - name: Deploy data stack
+        run: npx cdk deploy Oddssea-dev-Data --require-approval never
+        working-directory: infra
+
+      # The same script the local deploy uses. It checks FunctionError and
+      # the payload — `aws lambda invoke` exits 0 when the function throws —
+      # and passes --cli-read-timeout, because the CLI gives up after 60s
+      # while the migration Lambda is allowed five minutes to wait out a
+      # paused cluster.
+      - name: Run migrations
+        run: bash scripts/run-migrations.sh Oddssea-dev-Data
+
+      - name: Deploy app stack
         run: npx cdk deploy Oddssea-dev-App --require-approval never
         working-directory: infra
 

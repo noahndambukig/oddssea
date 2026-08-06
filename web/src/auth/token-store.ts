@@ -1,59 +1,56 @@
 /**
- * Where tokens live in the browser — and the honest tradeoff.
+ * Where tokens live in the browser — now: NOWHERE PERSISTENT.
  *
- * Any token JavaScript can read, injected JavaScript (XSS) can also read.
- * Every browser storage option is exposed to that; they differ only in how
- * long the exposure lasts:
+ * Increment B kept them in sessionStorage and said so honestly: any token
+ * JavaScript can read, injected JavaScript can read too, and the options
+ * differ only in how long the exposure lasts. That was an acceptable trade
+ * when there was nothing to steal.
  *
- *   localStorage     survives restarts — largest window
- *   sessionStorage   cleared when the tab closes — smaller window
- *   memory only      gone on refresh — user re-authenticates constantly
- *   httpOnly cookie  unreadable by JS, but needs a server-side session
- *                    layer ("backend for frontend") and CSRF handling
+ * A Shell balance ends that trade, which is exactly what decisions/0017
+ * gated on. So:
  *
- * This uses sessionStorage, with the refresh token cut to ONE DAY on the
- * Cognito side. Deliberate, and gated: docs/decisions/0017 makes a
- * backend-for-frontend REQUIRED before the first Shell balance exists.
- * A skeleton with nothing to steal may choose simplicity; a ledger may not.
+ *   refresh token   an httpOnly cookie the browser cannot read at all,
+ *                   set by the BFF (api/src/bff/). Not here. Not reachable
+ *                   from this file or any other client code.
+ *   access token    THIS MODULE, in a plain variable. Gone on refresh,
+ *                   re-obtained from POST /auth/refresh using the cookie.
+ *
+ * A module-level variable rather than sessionStorage is the whole change,
+ * and it is what makes `document.cookie` empty and devtools' Storage tab
+ * boring. XSS can still read a token out of memory while the page runs —
+ * nothing prevents that — but it can no longer take one that outlives the
+ * tab, and it can never take the refresh token at all.
  */
-
-const STORAGE_KEY = 'oddssea.tokens';
 
 export interface TokenSet {
   accessToken: string;
   idToken: string;
-  refreshToken: string;
   /** Epoch ms, derived from expires_in at issue time. */
   expiresAt: number;
 }
 
-export function saveTokens(tokens: TokenSet): void {
-  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(tokens));
+let tokens: TokenSet | null = null;
+
+export function saveTokens(next: TokenSet): void {
+  tokens = next;
 }
 
 export function loadTokens(): TokenSet | null {
-  const raw = sessionStorage.getItem(STORAGE_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as TokenSet;
-  } catch {
-    clearTokens(); // corrupt or stale shape — drop it, don't crash startup
-    return null;
-  }
+  return tokens;
 }
 
 export function clearTokens(): void {
-  sessionStorage.removeItem(STORAGE_KEY);
+  tokens = null;
 }
 
 /**
- * Treat tokens as expired a minute early, so one can't die in flight
+ * Treat tokens as expired a minute early, so one cannot die in flight
  * between our check and the server reading it.
  */
 const EXPIRY_SKEW_MS = 60_000;
 
-export function isExpired(tokens: TokenSet): boolean {
-  return Date.now() >= tokens.expiresAt - EXPIRY_SKEW_MS;
+export function isExpired(token: TokenSet): boolean {
+  return Date.now() >= token.expiresAt - EXPIRY_SKEW_MS;
 }
 
 /**

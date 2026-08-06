@@ -36,6 +36,24 @@ export class DataStack extends cdk.Stack {
     return `oddssea-${envName}-migrate`;
   }
 
+  /**
+   * State the availability zones instead of discovering them.
+   *
+   * By default CDK asks AWS which AZs this account has — a CONTEXT LOOKUP,
+   * which needs credentials. CI synthesises with none, deliberately: that is
+   * the entire point of the keyless OIDC design, and it is why the hosted
+   * zone is already cached in cdk.context.json. A VPC would have added a
+   * second lookup and broken every pipeline run until someone ran a
+   * credentialed synth locally and committed the result.
+   *
+   * Overriding the getter removes the lookup altogether. Safe here because
+   * the region is pinned to us-east-1 (lib/config.ts) and every region has
+   * at least these two zones. Aurora needs exactly two.
+   */
+  get availabilityZones(): string[] {
+    return [`${this.region}a`, `${this.region}b`];
+  }
+
   constructor(scope: Construct, id: string, props: DataStackProps) {
     super(scope, id, props);
 
@@ -56,7 +74,19 @@ export class DataStack extends cdk.Stack {
      * is exactly right for a database nothing else should reach.
      */
     const vpc = new ec2.Vpc(this, 'Vpc', {
-      maxAzs: 2, // Aurora needs two AZs; more would only add subnets.
+      /**
+       * Availability zones stated EXPLICITLY, not `maxAzs`.
+       *
+       * `maxAzs` makes CDK perform a context lookup to discover which AZs
+       * the account has — and a lookup needs credentials. CI synthesises
+       * with none (that is the whole point of the OIDC design), so `maxAzs`
+       * would fail every pipeline run until someone ran a credentialed
+       * synth locally and committed cdk.context.json. Naming the AZs
+       * removes the lookup, and the region is pinned to us-east-1 anyway.
+       *
+       * Two is Aurora's minimum; more would only add unused subnets.
+       */
+      availabilityZones: [`${config.region}a`, `${config.region}b`],
       natGateways: 0,
       subnetConfiguration: [
         {
@@ -123,8 +153,24 @@ export class DataStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
-    // Same reasoning for the cluster's own admin secret, which CDK created.
-    (this.cluster.secret?.node.defaultChild as secretsmanager.CfnSecret)?.applyRemovalPolicy(
+    /**
+     * Same reasoning for the cluster's own admin secret — but reaching it
+     * takes care.
+     *
+     * `cluster.secret` is the secret TARGET ATTACHMENT, not the secret. The
+     * obvious `cluster.secret.node.defaultChild` therefore sets a removal
+     * policy on a wrapper resource and leaves the actual credentials on the
+     * default, DELETE. Verified in the synthesized template: the attachment
+     * said Retain while `ClusterSecret` still said Delete — which would have
+     * produced the exact failure this is meant to prevent, a preserved
+     * snapshot whose admin password no longer exists.
+     *
+     * The real secret is the construct CDK creates at `Cluster/Secret`.
+     */
+    const adminSecret = this.cluster.node.tryFindChild('Secret') as
+      | secretsmanager.Secret
+      | undefined;
+    (adminSecret?.node.defaultChild as secretsmanager.CfnSecret | undefined)?.applyRemovalPolicy(
       cdk.RemovalPolicy.RETAIN,
     );
 
