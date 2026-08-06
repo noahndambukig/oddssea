@@ -288,8 +288,26 @@ export class Auth extends Construct {
     // Login enabled, which the domain is what enables.
     branding.node.addDependency(domain);
 
+    /**
+     * The SAME requirement for the BFF client — and it is PER CLIENT.
+     *
+     * Adding the BFF client without this produced exactly the error
+     * Increment B documented: "Login pages unavailable. Please contact an
+     * administrator." The failure mode was already in the walkthrough's
+     * table; what was missing was noticing that creating a *new* client
+     * re-triggers it. A per-resource requirement is easy to satisfy once
+     * and then forget is a requirement at all.
+     */
+    const bffBranding = new cognito.CfnManagedLoginBranding(this, 'BffBranding', {
+      userPoolId: this.userPool.userPoolId,
+      clientId: this.bffClient.userPoolClientId,
+      useCognitoProvidedValues: true,
+    });
+    bffBranding.node.addDependency(domain);
+
     readyGroup.add(domain);
     readyGroup.add(branding);
+    readyGroup.add(bffBranding);
     this.ready = readyGroup;
   }
 
