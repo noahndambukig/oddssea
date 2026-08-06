@@ -338,6 +338,8 @@ DECLARE
   v_odds numeric;
   v_won boolean;
   v_payout bigint := 0;
+  v_pearls_exact numeric;
+  v_pearls_pool numeric;
   v_pearls bigint;
   v_bet_id uuid;
   v_result jsonb;
@@ -371,9 +373,11 @@ BEGIN
                 ELSE p_roll > p_threshold END;
   IF v_won THEN v_payout := floor(p_stake * v_odds)::bigint; END IF;
 
-  v_pearls := floor(
-    (0.75 * p_stake * v_edge) + CASE WHEN v_won THEN 0.30 * p_stake * v_edge * v_odds ELSE 0 END
-  )::bigint;
+  -- The exact award, unrounded. 0.75 x stake x edge, plus on a win
+  -- 0.30 x stake x edge x odds (currency-model.md).
+  v_pearls_exact :=
+    (0.75 * p_stake * v_edge)
+    + CASE WHEN v_won THEN 0.30 * p_stake * v_edge * v_odds ELSE 0 END;
 
   SELECT * INTO v_player FROM public.players WHERE id = p_player_id FOR UPDATE;
 
@@ -383,6 +387,13 @@ BEGIN
   IF v_player.shells_balance < p_stake THEN
     RAISE EXCEPTION 'insufficient shells' USING ERRCODE = 'check_violation';
   END IF;
+
+  -- Add this bet's exact award to whatever fraction was carried, then split
+  -- the pool into whole Pearls (which enter the ledger) and a remainder
+  -- (which is carried again). Read under the row lock taken above, so two
+  -- concurrent bets cannot both consume the same carry.
+  v_pearls_pool := v_player.pearls_fraction + v_pearls_exact;
+  v_pearls := floor(v_pearls_pool)::bigint;
 
   INSERT INTO public.bets
     (player_id, game, stake, decimal_odds, state, payout, pearls_awarded,
@@ -410,7 +421,8 @@ BEGIN
 
   UPDATE public.players
      SET shells_balance = shells_balance - p_stake + v_payout,
-         pearls_balance = pearls_balance + v_pearls
+         pearls_balance = pearls_balance + v_pearls,
+         pearls_fraction = v_pearls_pool - v_pearls
    WHERE id = p_player_id;
 
   PERFORM public.assert_balance_matches_ledger(p_player_id);
@@ -419,7 +431,7 @@ BEGIN
     'betId', v_bet_id, 'won', v_won, 'roll', p_roll, 'rollMax', p_roll_max,
     'threshold', p_threshold, 'direction', p_direction,
     'odds', round(v_odds, 4), 'stake', p_stake, 'payout', v_payout,
-    'pearlsAwarded', v_pearls,
+    'pearlsAwarded', v_pearls, 'pearlsPending', round(pearls_fraction, 3),
     'shells', shells_balance, 'pearls', pearls_balance
   ) INTO v_result FROM public.players WHERE id = p_player_id;
 

@@ -54,6 +54,19 @@ CREATE TABLE players (
   last_claim_date   date,
   shells_balance    bigint NOT NULL DEFAULT 0 CHECK (shells_balance >= 0),
   pearls_balance    bigint NOT NULL DEFAULT 0 CHECK (pearls_balance >= 0),
+  -- Pearls are whole numbers in the ledger, but the award formula pays
+  -- fractions: 0.75 x stake x edge is 0.225 at the 10-Shell minimum. Flooring
+  -- each bet would pay a minimum-stake player NOTHING, and wagering is the
+  -- only source of Pearls (decisions/0005) — that player would be locked out
+  -- of the entire cosmetic economy. It also loses ~7% of the Pearl income
+  -- bankroll.py simulates, because that accumulates fractionally.
+  --
+  -- So fractions accumulate here and whole Pearls drop into the ledger when
+  -- the carry crosses 1. Nothing is lost; it just arrives a few bets later.
+  -- This is NOT currency: it is an accumulator, which is why it sits outside
+  -- the ledger and outside the balance assertion.
+  pearls_fraction   numeric(12, 6) NOT NULL DEFAULT 0
+                      CHECK (pearls_fraction >= 0 AND pearls_fraction < 1),
   created_at        timestamptz NOT NULL DEFAULT now()
 );
 
