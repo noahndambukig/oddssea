@@ -205,14 +205,34 @@ export class DataStack extends cdk.Stack {
         DATABASE_NAME: 'oddssea',
       },
       bundling: {
-        // esbuild bundles JavaScript. The .sql files are data, and without
-        // this hook they simply would not be in the deployment package.
+        /**
+         * esbuild bundles JavaScript. The .sql files are data, and without
+         * this hook they simply would not be in the deployment package.
+         *
+         * The copy runs through NODE, not `cp`.
+         *
+         * CDK executes these hooks through the platform shell — `cmd.exe` on
+         * Windows, where `cp` does not exist. It works under Git Bash, which
+         * ships coreutils, so the failure is invisible to anyone who
+         * synthesises there and immediate for anyone who uses PowerShell. A
+         * build step that depends on which terminal you opened is a bug
+         * whatever it copies. Node is guaranteed present: CDK is running on
+         * it.
+         *
+         * Paths are normalised to forward slashes because Windows paths
+         * contain backslashes, which would be escape sequences inside the
+         * JavaScript string literal below.
+         */
         commandHooks: {
           beforeBundling: () => [],
           beforeInstall: () => [],
-          afterBundling: (inputDir: string, outputDir: string) => [
-            `cp -r ${inputDir}/api/migrations ${outputDir}/migrations`,
-          ],
+          afterBundling: (inputDir: string, outputDir: string) => {
+            const from = `${inputDir}/api/migrations`.replace(/\\/g, '/');
+            const to = `${outputDir}/migrations`.replace(/\\/g, '/');
+            return [
+              `node -e "require('fs').cpSync('${from}','${to}',{recursive:true})"`,
+            ];
+          },
         },
       },
     });
