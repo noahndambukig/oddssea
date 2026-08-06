@@ -29,6 +29,17 @@ export function GamePanel() {
 
   if (!config || !me) return null;
 
+  /**
+   * Already claimed today? The server is the authority — it refuses a second
+   * claim regardless of what this button does — but offering an action that
+   * cannot succeed is a bad interface. Days are UTC everywhere in this
+   * system (data-model.md rule 6), so the comparison must be too: using the
+   * browser's local date would disable the button at the wrong moment for
+   * anyone west of Greenwich.
+   */
+  const todayUtc = new Date().toISOString().slice(0, 10);
+  const claimedToday = me.lastClaimDate === todayUtc;
+
   async function run<T>(label: string, work: () => Promise<T>): Promise<T | null> {
     setBusy(label);
     setMessage(null);
@@ -112,8 +123,12 @@ export function GamePanel() {
           cached summary the server re-checks on every write.
         </p>
         <div className="actions">
-          <button onClick={claim} disabled={busy !== null}>
-            {busy === 'claim' ? 'Claiming…' : 'Claim daily login'}
+          <button onClick={claim} disabled={busy !== null || claimedToday}>
+            {busy === 'claim'
+              ? 'Claiming…'
+              : claimedToday
+                ? 'Claimed today — back tomorrow'
+                : 'Claim daily login'}
           </button>
         </div>
       </section>

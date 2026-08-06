@@ -231,7 +231,17 @@ export async function handler(
     const rule = /already claimed|insufficient|has not attested|below minimum|no contest/i.test(
       message,
     );
-    if (rule) return toResult(json(400, { error: 'rule_violation', detail: message }));
+    if (rule) {
+      // The database's message is the useful part; its wrapper is not. The
+      // Data API returns "ERROR: already claimed today; SQLState: 23505" —
+      // a player should see the sentence, not the SQLSTATE. Leaking internal
+      // error codes to a UI is both noise and a small information leak.
+      const clean = message
+        .replace(/^ERROR:\s*/i, '')
+        .replace(/;\s*SQLState:.*$/i, '')
+        .trim();
+      return toResult(json(400, { error: 'rule_violation', detail: clean }));
+    }
 
     console.error('Unhandled error', error);
     return toResult(json(400, { error: 'request_failed' }));
