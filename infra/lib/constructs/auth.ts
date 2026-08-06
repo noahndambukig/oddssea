@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import { Construct, IDependable, DependencyGroup } from 'constructs';
 import { AppConfig } from '../config';
@@ -31,6 +32,9 @@ export interface AuthProps {
 export class Auth extends Construct {
   readonly userPool: cognito.UserPool;
   readonly userPoolClient: cognito.UserPoolClient;
+  /** The confidential client the BFF uses; the authorizer's audience. */
+  readonly bffClient: cognito.UserPoolClient;
+  readonly bffClientSecret: secretsmanager.Secret;
 
   /** Base URL of the login pages, e.g. https://auth.oddssea.xyz */
   readonly loginBaseUrl: string;
@@ -81,7 +85,11 @@ export class Auth extends Construct {
         requireSymbols: false,
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // dev only — RETAIN for prod
+      // RETAIN, from the ledger milestone onward. The database is SNAPSHOT
+      // and players are keyed by the Cognito sub, so a DESTROY pool would
+      // leave a perfectly preserved ledger permanently detached from every
+      // user who owned it. Durability is a property of the whole system.
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
     let domain: cognito.UserPoolDomain;
@@ -198,6 +206,68 @@ export class Auth extends Construct {
       // in sessionStorage until a backend-for-frontend lands, and a short
       // refresh lifetime bounds what a stolen copy is worth.
       refreshTokenValidity: cdk.Duration.days(1),
+    });
+
+    /**
+     * The BFF client — CONFIDENTIAL, and that is the whole point.
+     *
+     * A backend-for-frontend runs on a server, so it can hold a real client
+     * secret. That is both the correct OAuth configuration and a structural
+     * guarantee: a browser cannot use this client at all, because it cannot
+     * have the secret.
+     *
+     * It also does the rollout work. The JWT authorizer's audience switches
+     * to THIS client, so the one-day refresh tokens still sitting in open
+     * tabs' sessionStorage stop working the moment this deploys — an
+     * audience check rather than a waiting period.
+     *
+     * The old public client above stays until nothing references it, then
+     * gets removed in its own change.
+     */
+    this.bffClient = this.userPool.addClient('BffClient', {
+      userPoolClientName: `oddssea-${config.envName}-bff`,
+      generateSecret: true,
+      authFlows: {
+        userPassword: false,
+        userSrp: false,
+        adminUserPassword: false,
+        custom: false,
+      },
+      oAuth: {
+        flows: { authorizationCodeGrant: true, implicitCodeGrant: false },
+        // No COGNITO_ADMIN here: attestation now writes to Postgres through
+        // POST /me/attest, so the access token no longer needs to call
+        // Cognito's self-service user APIs at all.
+        scopes: [
+          cognito.OAuthScope.OPENID,
+          cognito.OAuthScope.EMAIL,
+          cognito.OAuthScope.PROFILE,
+        ],
+        // COMPLETE callback URIs, matched by Cognito as whole strings — an
+        // origin would simply be rejected.
+        callbackUrls: [`${appUrl}/auth/callback`, 'http://localhost:5173/auth/callback'],
+        logoutUrls: [appUrl, 'http://localhost:5173'],
+      },
+      preventUserExistenceErrors: true,
+      enableTokenRevocation: true,
+      accessTokenValidity: cdk.Duration.hours(1),
+      idTokenValidity: cdk.Duration.hours(1),
+      // Now that the refresh token lives in an httpOnly cookie rather than
+      // sessionStorage, the one-day limit imposed by 0017 has served its
+      // purpose. Kept at one day for this milestone anyway: changing two
+      // things at once makes a regression impossible to attribute.
+      refreshTokenValidity: cdk.Duration.days(1),
+    });
+
+    /**
+     * The client secret, so the API Lambda can read it at runtime.
+     *
+     * `userPoolClientSecret` is a CDK-resolved token, not a literal in the
+     * template, so it never appears in plaintext in CloudFormation.
+     */
+    this.bffClientSecret = new secretsmanager.Secret(this, 'BffClientSecret', {
+      description: 'oddssea BFF Cognito client secret',
+      secretStringValue: this.bffClient.userPoolClientSecret,
     });
 
     /**

@@ -63,8 +63,22 @@ export class AppStack extends cdk.Stack {
       config,
       appUrl: web.appUrl,
       issuerUrl: auth.issuerUrl,
-      userPoolClientId: auth.userPoolClient.userPoolClientId,
+      // The authorizer's audience is the BFF client, not the old public
+      // one. That switch is what invalidates the legacy sessionStorage
+      // tokens still held by any tab open across the deploy — an audience
+      // check rather than a waiting period.
+      userPoolClientId: auth.bffClient.userPoolClientId,
+      cluster: props.cluster,
+      appSecret: props.appSecret,
+      cognitoDomain: auth.loginBaseUrl,
+      bffClientId: auth.bffClient.userPoolClientId,
+      bffClientSecret: auth.bffClientSecret,
     });
+
+    // Route /auth/* on the app's own origin to the API, so the BFF's
+    // session cookie is first-party. Attached here rather than inside Web
+    // because it needs the API's hostname.
+    web.addAuthBehaviour(api.apiUrl, web.redirectFunction);
 
     // One shared, finite log group for the BucketDeployments' singleton
     // helper Lambda. Deliberately NOT the logRetention prop: that legacy
@@ -123,7 +137,7 @@ export class AppStack extends cdk.Stack {
           // Increment B: everything the browser needs to run the login
           // flow — none of it known until CloudFormation creates it.
           userPoolId: auth.userPool.userPoolId,
-          userPoolClientId: auth.userPoolClient.userPoolClientId,
+          userPoolClientId: auth.bffClient.userPoolClientId,
           cognitoDomain: auth.loginBaseUrl,
           // Increment C: where the browser sends API calls.
           apiUrl: api.apiUrl,
@@ -177,6 +191,11 @@ export class AppStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'UserPoolId', { value: auth.userPool.userPoolId });
     new cdk.CfnOutput(this, 'UserPoolClientId', {
       value: auth.userPoolClient.userPoolClientId,
+      description: 'The legacy public client — retired once nothing uses it',
+    });
+    new cdk.CfnOutput(this, 'BffClientId', {
+      value: auth.bffClient.userPoolClientId,
+      description: 'Confidential client; the JWT authorizer audience',
     });
     new cdk.CfnOutput(this, 'IssuerUrl', {
       value: auth.issuerUrl,

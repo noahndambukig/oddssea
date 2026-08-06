@@ -120,6 +120,28 @@ export class CicdStack extends cdk.Stack {
       }),
     );
 
+    /**
+     * Invoke the migration Lambda between the Data and App deploys.
+     *
+     * The ARN is CONSTRUCTED, not referenced: this stack is deployed by hand
+     * before the Data stack exists, so it cannot point at a resource that
+     * has not been created. That is why the migration function carries a
+     * fixed name rather than a generated one.
+     *
+     * The function name itself is read from the Data stack's outputs via
+     * DescribeStacks above, which is already permitted — so no SSM
+     * permission is needed for it either.
+     */
+    deployRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'InvokeMigrationFunction',
+        actions: ['lambda:InvokeFunction'],
+        resources: [
+          `arn:aws:lambda:${this.region}:${this.account}:function:oddssea-${config.envName}-migrate`,
+        ],
+      }),
+    );
+
     new cdk.CfnOutput(this, 'DeployRoleArn', {
       value: deployRole.roleArn,
       description: 'Set this as the GitHub repository variable AWS_DEPLOY_ROLE_ARN',

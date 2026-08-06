@@ -32,7 +32,9 @@ export class DataStack extends cdk.Stack {
   readonly appSecret: secretsmanager.Secret;
 
   /** Deterministic name so CicdStack can grant against it before it exists. */
-  static readonly MIGRATION_FUNCTION_NAME = 'oddssea-dev-migrate';
+  static migrationFunctionName(envName: string): string {
+    return `oddssea-${envName}-migrate`;
+  }
 
   constructor(scope: Construct, id: string, props: DataStackProps) {
     super(scope, id, props);
@@ -143,7 +145,7 @@ export class DataStack extends cdk.Stack {
      * before any migration runs.
      */
     const migrationFunction = new NodejsFunction(this, 'Migrate', {
-      functionName: DataStack.MIGRATION_FUNCTION_NAME,
+      functionName: DataStack.migrationFunctionName(config.envName),
       entry: path.join(__dirname, '../../api/src/migrate.ts'),
       handler: 'handler',
       runtime: lambda.Runtime.NODEJS_22_X,
@@ -189,6 +191,5 @@ export class DataStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'AppSecretArn', { value: this.appSecret.secretArn });
 
     cdk.Tags.of(this).add('stack-role', 'data');
-    void config;
   }
 }
