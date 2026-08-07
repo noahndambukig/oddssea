@@ -975,6 +975,66 @@ is already claimed.
 | `SUM(ledger_entries)` = cached balances | The assert holds with three new payers |
 | `pg_proc.proacl` on all three functions → no PUBLIC entry | 007's global fix, proven on its first new migration |
 
+## Part 11 — the closet: wearing what you own
+
+### What changes
+
+Every previous milestone moved currency or minted items; this one closes
+the last verb — **wear**. One table (`loadouts`: per slot, a gear
+*instance* and a skin *instance*), one column of evidence
+(`players.first_equipped_at`), one function, one route, one barebones
+panel. The tour grows its equip step and the first feature-first pays.
+
+### Concepts before commands
+
+- **Instance references, not catalogue references.** Two copies of the
+  same garment are different `items` rows, and the loadout names WHICH
+  one you wear. That distinction is invisible today and load-bearing
+  later: Mythic provenance and salvage both operate on instances.
+- **Natural idempotency vs keyed idempotency.** `set_equipment` takes no
+  `Idempotency-Key` — replaying it converges on the same state and moves
+  no money. The keyed machinery exists to make *economic* retries return
+  a stored response; bolting it onto a state overwrite would imply
+  replay semantics that don't exist. Know which kind of idempotent your
+  operation is.
+- **The contract half of expand/contract waits out the rollback
+  window.** 009 only ADDS (new table, new column, two new claimable
+  keys); the chain rewire that would make an old handler's tour
+  unfinishable ships as 010 — in the NEXT milestone, when rolling the
+  app back still lands on code that can equip. "Migrations run minutes
+  before the handler" was lesson one; "and they outlive a rollback" is
+  lesson two, caught by review round 2 of this very plan.
+- **Events, not state, for achievements.** "First cosmetic equipped" is
+  something that HAPPENED — so it is a COALESCE'd timestamp, never
+  unset, and both the SQL condition and the UI claimable flag read that
+  one source. Deriving it from the live loadout would erase credit on
+  unequip and lie in both directions.
+- **Validation placement by forgeability.** Ownership, kind and state
+  are checked in SQL — a compromised handler cannot equip someone else's
+  item. Slot-fit is checked in the handler — SQL has no catalogue, and
+  the worst a handler bug can do there is put a hat on your feet,
+  cosmetically, never economically.
+
+### The adversarial checks — this is the deliverable
+
+A fresh third player (`closet-test@`) walks the four-step tour in the
+UI's order; the existing players prove the chain rewrite left history
+standing. Highlights: equipping another player's item id → SQL
+rejection; equip-then-unequip-then-claim still pays (the timestamp is
+the evidence); a crate open's `collection-changed` event lands the new
+item in the closet's selects without a reload; `UPDATE loadouts` as the
+app role → permission denied while the function path works — mutable by
+design, but only through the single door.
+
+## Failure modes worth recognising (the closet)
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| A player's equip vanished after salvage lands (future) | Salvage consumed an equipped instance without unequipping | The 0025 forward obligation: economy pass 2 must unequip or refuse. If you are reading this after it happened, the loadout row points at a `consumed` item |
+| `tour:first-bet` claimable before the equip step | Working as designed UNTIL migration 010 (next milestone) — the SQL chain is deliberately permissive while the rollback window is open | The UI presents the right order; 010 enforces it. If 010 is long overdue, ship it |
+| Equip succeeds but the tour step stays unclaimable | The claimable flag and the SQL condition read different evidence | Both must read `players.first_equipped_at`. If they diverged, someone re-derived one of them from the live loadout |
+| A panel shows stale items/equipment after acting in another panel | A producer forgot to dispatch (`collection-changed` for items/equipment, `tasks-changed` for progress) | Every mutating action dispatches; listeners are cheap, silent staleness is not |
+
 ## Failure modes worth recognising (tasks)
 
 | Symptom | Cause | Fix |

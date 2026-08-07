@@ -281,6 +281,14 @@ export class Api extends Construct {
       authorizationScopes: ['openid'],
     });
 
+    const closetRoutes = httpApi.addRoutes({
+      path: '/closet/{proxy+}',
+      methods: [apigwv2.HttpMethod.POST],
+      integration,
+      authorizer,
+      authorizationScopes: ['openid'],
+    });
+
     // The serving resources. The routes' own references pull the
     // integration, authorizer and Lambda permission along transitively;
     // the default stage is a sibling of all of them and, domainless, the
@@ -296,6 +304,7 @@ export class Api extends Construct {
       ...betRoutes,
       ...crateRoutes,
       ...collectionRoutes,
+      ...closetRoutes,
     ]) {
       readyGroup.add(route);
     }

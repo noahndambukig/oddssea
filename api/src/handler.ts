@@ -37,13 +37,16 @@ import {
   PITY,
   SETS,
   SKIN_PAGES,
+  SLOTS,
   STARTER_COMPOSITION,
   itemById,
   type CrateKind,
+  type Slot,
 } from './catalogue';
 import { buildOpen, type OpenSpec } from './crates';
 import {
   AMOUNTS,
+  FEATURE_FIRSTS,
   TARGETS,
   TOUR_STEPS,
   dailyDraw,
@@ -79,8 +82,10 @@ async function currentPlayer(event: APIGatewayProxyEventV2WithJWTAuthorizer) {
     age_attested_at: string | null;
     streak_run: number;
     last_claim_date: string | null;
+    first_equipped_at: string | null;
   }>(
-    `SELECT id, shells_balance, pearls_balance, age_attested_at, streak_run, last_claim_date
+    `SELECT id, shells_balance, pearls_balance, age_attested_at, streak_run, last_claim_date,
+            first_equipped_at
        FROM players WHERE cognito_sub = :sub`,
     { sub },
   );
@@ -102,6 +107,7 @@ async function currentPlayer(event: APIGatewayProxyEventV2WithJWTAuthorizer) {
     age_attested_at: null,
     streak_run: 0,
     last_claim_date: null,
+    first_equipped_at: null,
   };
 }
 
@@ -216,7 +222,11 @@ async function claimTask(playerId: string, key: string, taskKey: string): Promis
         p_player_id: playerId,
         p_idempotency_key: key,
         p_claim_key: taskKey,
-        p_amount: taskKey.startsWith('tour:') ? AMOUNTS.tourStep : AMOUNTS.firstBetGame,
+        p_amount: taskKey.startsWith('tour:')
+          ? AMOUNTS.tourStep
+          : taskKey === 'first_equip'
+            ? AMOUNTS.featureFirst
+            : AMOUNTS.firstBetGame,
       },
       { casts: { p_player_id: 'uuid' } },
     );
@@ -441,10 +451,17 @@ export async function handler(
             ? Math.min(Number(agg.wins_today) > 0 ? 1 : 0, entry.target)
             : Math.min(Number(agg.bets_today), entry.target);
 
+        // Claimable flags read the SAME evidence as the SQL conditions:
+        // equip credit is players.first_equipped_at (an event timestamp),
+        // never the live loadout. tour:first-bet's UI gate presents the
+        // spec's order (after equip) even while SQL stays permissive
+        // until 010 lands next milestone.
+        const hasEquipped = player.first_equipped_at !== null;
         const tourClaimable: Record<string, boolean> = {
           'tour:economy-intro': true,
           'tour:starter-crates': owned.has('tour:economy-intro') && starterClaimed,
-          'tour:first-bet': owned.has('tour:starter-crates') && Number(agg.bets_ever) > 0,
+          'tour:equip': owned.has('tour:starter-crates') && hasEquipped,
+          'tour:first-bet': owned.has('tour:equip') && Number(agg.bets_ever) > 0,
         };
 
         return toResult(
@@ -503,6 +520,13 @@ export async function handler(
                 claimed: owned.has('first_bet:dice'),
                 claimable: !owned.has('first_bet:dice') && Number(agg.bets_dice) > 0,
               },
+              ...FEATURE_FIRSTS.map((f) => ({
+                key: f.key,
+                name: f.name,
+                amount: AMOUNTS.featureFirst,
+                claimed: owned.has(f.key),
+                claimable: !owned.has(f.key) && hasEquipped,
+              })),
             ],
           }),
         );
@@ -520,6 +544,7 @@ export async function handler(
           'weekly:consistency',
           ...TOUR_STEPS.map((s) => s.key),
           'first_bet:dice',
+          ...FEATURE_FIRSTS.map((f) => f.key),
         ]);
         if (!body.taskKey || !valid.has(body.taskKey)) {
           return toResult(json(400, { error: 'unknown_task_key' }));
@@ -527,6 +552,67 @@ export async function handler(
 
         const player = await currentPlayer(event);
         const result = await claimTask(player.id, key, body.taskKey);
+        return toResult(json(200, result));
+      }
+
+      // ---------------------------------------------------------- closet
+      case 'POST /closet/equip': {
+        const body = JSON.parse(event.body ?? '{}') as {
+          slot?: string;
+          gearItemId?: string | null;
+          skinItemId?: string | null;
+        };
+        if (!body.slot || !SLOTS.includes(body.slot as Slot)) {
+          return toResult(json(400, { error: 'unknown_slot' }));
+        }
+
+        const player = await currentPlayer(event);
+
+        // Slot-fit is catalogue knowledge and is enforced HERE: the item's
+        // catalogue entry must occupy the requested slot (keystones carry
+        // their keystone_slot in the catalogue, so they fit shirt with no
+        // special case). Ownership, kind and state — the unforgeable
+        // checks — are re-verified inside set_equipment.
+        const ids = [body.gearItemId, body.skinItemId].filter(
+          (v): v is string => typeof v === 'string' && v.length > 0,
+        );
+        if (ids.length) {
+          const rows = await query<{ id: string; catalogue_id: string; kind: string }>(
+            `SELECT id, catalogue_id, kind FROM items
+              WHERE player_id = :player::uuid AND id = ANY(string_to_array(:ids, ',')::uuid[])`,
+            { player: player.id, ids: ids.join(',') },
+          );
+          for (const wanted of ids) {
+            const row = rows.find((r) => r.id === wanted);
+            if (!row) return toResult(json(400, { error: 'unknown_item' }));
+            const item = itemById(row.catalogue_id);
+            if (item.slot !== body.slot) return toResult(json(400, { error: 'wrong_slot' }));
+            const axis = wanted === body.gearItemId ? 'gear' : 'skin';
+            if (item.kind !== axis) return toResult(json(400, { error: 'wrong_item_kind' }));
+          }
+        }
+
+        const result = await callFunction<{
+          slot: string;
+          gearItemId: string | null;
+          skinItemId: string | null;
+          firstEquippedAt: string | null;
+        }>(
+          'set_equipment',
+          {
+            p_player_id: player.id,
+            p_slot: body.slot,
+            p_gear_item_id: body.gearItemId ?? null,
+            p_skin_item_id: body.skinItemId ?? null,
+          },
+          {
+            casts: {
+              p_player_id: 'uuid',
+              p_gear_item_id: 'uuid',
+              p_skin_item_id: 'uuid',
+            },
+          },
+        );
         return toResult(json(200, result));
       }
 
@@ -595,9 +681,9 @@ export async function handler(
         // Plain reads under the SELECT grants — no function needed. The
         // catalogue (names, pages, sets, prices, thresholds) is resolved
         // here in Node; the database holds only ownership and counters.
-        const [items, dex, pity, claims] = await Promise.all([
-          query<{ catalogue_id: string; source: string; state: string; acquired_at: string }>(
-            `SELECT catalogue_id, source, state, acquired_at
+        const [items, dex, pity, claims, loadouts] = await Promise.all([
+          query<{ id: string; catalogue_id: string; source: string; state: string; acquired_at: string }>(
+            `SELECT id, catalogue_id, source, state, acquired_at
                FROM items WHERE player_id = :id::uuid ORDER BY acquired_at`,
             { id: player.id },
           ),
@@ -618,6 +704,11 @@ export async function handler(
           ),
           query<{ claim_key: string; amount: number }>(
             `SELECT claim_key, amount FROM one_time_claims WHERE player_id = :id::uuid`,
+            { id: player.id },
+          ),
+          query<{ slot: string; gear_item_id: string | null; skin_item_id: string | null }>(
+            `SELECT slot, gear_item_id, skin_item_id FROM loadouts
+              WHERE player_id = :id::uuid AND preset = 1`,
             { id: player.id },
           ),
         ]);
@@ -654,6 +745,9 @@ export async function handler(
             items: items.map((row) => {
               const item = itemById(row.catalogue_id);
               return {
+                // The instance id — the closet equips INSTANCES, and this
+                // is what /closet/equip takes.
+                itemId: row.id,
                 catalogueId: row.catalogue_id,
                 name: item.name,
                 kind: item.kind,
@@ -665,6 +759,22 @@ export async function handler(
                 acquiredAt: row.acquired_at,
               };
             }),
+            equipment: Object.fromEntries(
+              SLOTS.map((slot) => {
+                const row = loadouts.find((l) => l.slot === slot);
+                const decorate = (instanceId: string | null) => {
+                  if (!instanceId) return null;
+                  const owned = items.find((i) => i.id === instanceId);
+                  if (!owned) return null;
+                  const item = itemById(owned.catalogue_id);
+                  return { itemId: instanceId, catalogueId: owned.catalogue_id, name: item.name, tier: item.tier };
+                };
+                return [slot, {
+                  gear: decorate(row?.gear_item_id ?? null),
+                  skin: decorate(row?.skin_item_id ?? null),
+                }];
+              }),
+            ),
             gearPages: GEAR_PAGES.map(toPage),
             skinPages: SKIN_PAGES.map(toPage),
             sets: SETS.map((set) => ({
@@ -694,7 +804,7 @@ export async function handler(
     // attested". Surfacing the message is deliberate.
     const message = error instanceof Error ? error.message : String(error);
     const rule =
-      /already claimed|insufficient|has not attested|below minimum|no contest|must be claimed first|not yet complete|not in today|rolled over/i.test(
+      /already claimed|insufficient|has not attested|below minimum|no contest|must be claimed first|not yet complete|not in today|rolled over|not owned/i.test(
         message,
       );
     if (rule) {

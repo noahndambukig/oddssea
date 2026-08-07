@@ -44,6 +44,7 @@ export const AMOUNTS = {
   weeklyVolume: tasksData.weekly.volume.amount_shells,
   tourStep: tasksData.one_time.tour_step_shells,
   firstBetGame: tasksData.one_time.first_bet_game_shells,
+  featureFirst: tasksData.one_time.feature_first_shells,
 } as const;
 
 export const TARGETS = {
@@ -53,6 +54,7 @@ export const TARGETS = {
 } as const;
 
 export const TOUR_STEPS = tasksData.one_time.tour_steps;
+export const FEATURE_FIRSTS = tasksData.one_time.feature_firsts;
 export const TASKS_VERSION = tasksData.content_version;
 export const DRAW_SIZE = tasksData.challenges.draw_size;
 
@@ -139,5 +141,8 @@ function assertTasks(condition: boolean, message: string): void {
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   assertTasks(dailyDraw(today).length >= 1, 'the pool draws empty for today');
   assertTasks(dailyDraw(tomorrow).length >= 1, 'the pool draws empty for tomorrow');
-  assertTasks(TOUR_STEPS.length === 3, 'tour must be exactly the three shipped steps');
+  assertTasks(TOUR_STEPS.length === 4, 'tour must be exactly the four shipped steps');
+  assertTasks(TOUR_STEPS[2].key === 'tour:equip', 'the equip step sits third, per the spec order');
+  assertTasks(FEATURE_FIRSTS.length === 1 && FEATURE_FIRSTS[0].key === 'first_equip',
+    'feature firsts must be exactly the shipped first_equip');
 })();

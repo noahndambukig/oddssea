@@ -80,6 +80,9 @@ export function GamePanel() {
         lastClaimDate: result.claimDate,
       });
       setMessage(`Claimed ${result.claimed} Shells — day ${result.streak} of the streak.`);
+      // The login claim is part of the daily set — the tasks panel's
+      // consistency progress depends on it.
+      window.dispatchEvent(new CustomEvent('oddssea:tasks-changed'));
     }
   }
 
@@ -96,6 +99,10 @@ export function GamePanel() {
     if (result) {
       applyMe({ ...me!, shells: result.shells, pearls: result.pearls });
       setLastRoll(result);
+      // Bets change task PROGRESS (first-bet, place-N, win-a-bet, weekly
+      // volume), not the collection — hence the second event: overloading
+      // collection-changed would refetch the whole collection per roll.
+      window.dispatchEvent(new CustomEvent('oddssea:tasks-changed'));
     }
   }
 

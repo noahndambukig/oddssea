@@ -3,6 +3,7 @@ import { useAuth } from './auth/AuthContext';
 import { AttestationGate } from './auth/AttestationGate';
 import { GamePanel } from './GamePanel';
 import { TasksPanel } from './TasksPanel';
+import { ClosetPanel } from './ClosetPanel';
 import { CratesPanel } from './CratesPanel';
 
 export default function App() {
@@ -86,6 +87,7 @@ export default function App() {
         <>
           <GamePanel />
           <TasksPanel />
+          <ClosetPanel />
           <CratesPanel />
 
           <section className="panel">
