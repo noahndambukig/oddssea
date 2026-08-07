@@ -1,7 +1,7 @@
 ---
 status: agreed
 purpose: What the game runs on and how players reach it.
-depends-on: ../decisions/0006-web-first-on-a-web-native-stack.md
+depends-on: ../decisions/0006-web-first-on-a-web-native-stack.md, ../decisions/0022-laptop-first-mechanics-before-art.md
 implemented-by: ../../web/
 ---
 
@@ -16,11 +16,16 @@ a settled foundation.
 
 ## How it works
 
-**One web app, every screen size.** The same URL serves phones and desktops.
-Every screen is designed for a ~375px portrait phone first and expanded for
-desktop — never the reverse. Navigation is a bottom tab bar on phones and a
-sidebar on desktop; wager slips are bottom sheets on mobile, side panels on
-desktop.
+**One web app, every screen size — designed for the laptop.** The same URL
+serves phones and desktops. Screens are designed for desktop and must remain
+*usable* at phone width (`decisions/0022`, reversing the original
+phone-first rule). Phone layouts are a functional pass, not a separate
+design: nothing may be unreachable or broken on a phone, but the desktop
+drives layout decisions.
+
+**Barebones until the mechanics are done** (`decisions/0022`): buttons,
+text and lists carry every feature until the game works end to end. The
+PixiJS surfaces below describe the art phase, not the current build.
 
 **The PWA layer** makes it feel like an app: a web manifest (`display:
 standalone`, home-screen icon — the sailboat, see
@@ -43,11 +48,14 @@ step waits for the compliance pass.
 
 ## Rules
 
-- **Mobile-first is a gate, not a preference.** A screen that has not been
-  checked at phone width is not done.
+- **Phone-usable is a gate; phone-first is not** (`decisions/0022`). A
+  screen that is broken or unreachable at phone width is not done; a screen
+  that is merely desktop-shaped is fine.
 - **No hover-dependent interactions.** Touch has no hover; tooltips and the
-  combined-rarity readout need tap equivalents.
-- **Touch targets ≥ 44px.** Safe-area padding for notches.
+  combined-rarity readout need tap equivalents. Survives laptop-first,
+  because phones remain supported.
+- **Touch targets ≥ 44px on interactive controls.** Checked in the
+  phone-usable pass rather than driving the design.
 - **The client renders; it never decides.** All economy outcomes are
   server-side — see `hosting.md`.
 - **WebGL performance is budgeted on low-end phones.** The

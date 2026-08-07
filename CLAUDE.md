@@ -151,7 +151,7 @@ requires a decision entry.
 | Economy | Agreed — wager economy simulated and **seeded/reproducible** (`docs/decisions/0005`–`0011`, `0019`), **not playtested** |
 | Launch game roster | **Agreed** — 7 games (`docs/decisions/0007`), Pass 3 verified (`docs/decisions/0019`) |
 | Core game loop | **Agreed** — `docs/01-game/` (core-loop, tasks, game-modes, racers) all Pass 3 verified (`docs/decisions/0019`) |
-| Platform + hosting | Agreed — web-first PWA on AWS, `docs/04-technical/` |
+| Platform + hosting | Agreed — web-first PWA on AWS, **laptop-first, barebones UI until mechanics complete** (`docs/decisions/0022`), `docs/04-technical/` |
 | Deployment skeleton | **Complete — A, B and C live and verified.** oddssea.xyz on keyless CI/CD; Cognito login on auth.oddssea.xyz; api.oddssea.xyz with a JWT-guarded API. Branding deferred to late polish |
 | Ledger milestone | **LIVE** — real Shell/Pearl balances on Aurora Serverless v2 (scale-to-zero, Data API), a backend-for-frontend, and every write behind a `SECURITY DEFINER` function (`decisions/0020`, `0021`). Verified in production over 32 economic events: balances match the ledger sum, and `UPDATE ledger_entries` as the app role is `permission denied`. Walkthrough Part 8 in `infra/README.md` |
 | Data model | **Agreed** — `docs/04-technical/data-model.md`; Pass 3 found 11 issues, 4 that would have shipped broken (`decisions/0015`, `0018`) |
