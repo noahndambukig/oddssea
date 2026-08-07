@@ -100,12 +100,16 @@ export class DataStack extends cdk.Stack {
     /**
      * The cluster.
      *
-     * `serverlessV2MinCapacity: 0` is what makes this project affordable:
-     * with no connections for the idle window, the instance pauses and bills
-     * nothing but storage. It is also fragile in a specific way — ANY held
-     * connection prevents it (RDS Proxy, a scheduled job, a psql session
-     * left open on your laptop), silently and with no error. See
-     * docs/decisions/0020.
+     * `serverlessV2MinCapacity: 0.5` — ALWAYS ON, deliberately, since
+     * decisions/0026: dev runs on AWS credits (~$44/mo at the 0.5 floor),
+     * which buys no cold starts and makes scheduled work legal (a ticker
+     * no longer sabotages a pause that no longer exists). The
+     * scale-to-zero era (minCapacity 0, 10-minute auto-pause,
+     * decisions/0020) is recorded in the decision log and the walkthrough;
+     * the client's 503/waking machinery stays, harmlessly, for restarts
+     * and failovers. The plan of record migrates off Aurora entirely
+     * before launch — everything SQL here is deliberately plain Postgres
+     * so that stays a one-session move.
      *
      * `storageEncrypted` defaults to FALSE in CDK, and encryption cannot be
      * switched on in place afterwards — it needs a snapshot-copy-and-restore
@@ -114,17 +118,13 @@ export class DataStack extends cdk.Stack {
      */
     this.cluster = new rds.DatabaseCluster(this, 'Cluster', {
       engine: rds.DatabaseClusterEngine.auroraPostgres({
-        // Pinned inside the range AWS documents for auto-pause (16.3+,
-        // 15.7+, 14.12+, 13.15+). 17.x postdates that list, and the entire
-        // cost model rests on minimum-capacity-0 actually being honoured.
         version: rds.AuroraPostgresEngineVersion.VER_16_13,
       }),
       vpc,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
       writer: rds.ClusterInstance.serverlessV2('Writer'),
-      serverlessV2MinCapacity: 0,
+      serverlessV2MinCapacity: 0.5,
       serverlessV2MaxCapacity: 2,
-      serverlessV2AutoPauseDuration: cdk.Duration.minutes(10),
       enableDataApi: true,
       storageEncrypted: true,
       defaultDatabaseName: 'oddssea',
