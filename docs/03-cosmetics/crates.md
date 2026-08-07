@@ -3,6 +3,7 @@ status: agreed — simulated, not playtested
 purpose: Crate types, drop tables, pity rules and new-player guarantees.
 note: Prices live in 02-economy/currency-model.md, not here.
 depends-on: ../decisions/0009-pearl-to-item-pipeline.md, ../decisions/0010-crate-volume-and-premium-tier.md, ../decisions/0011-accountwide-pity-catalogue-expansion.md
+implemented-by: ../../api/src/catalogue.ts, ../../api/src/crates.ts, ../../api/migrations/006_crates.sql
 ---
 
 # Crates
@@ -60,6 +61,15 @@ details are `00-project/roadmap.md`, question 3.
 pieces.** Without this, duplicate luck dominates the early chase, and
 getting the same piece three times in your first three pulls is the
 fastest way to make a player abandon a set.
+
+The **keystone is exempt** from that guarantee: a Legendary roll always
+returns the keystone, even if a previous Legendary already did — exactly
+as the simulation of record redirects only non-keystone pieces
+(`crate-game.py`; `decisions/0023`). The guarantee exists to prevent
+triple-common misery, not double jackpots, and redirecting the second
+keystone would make the chase cheaper than the simulated numbers.
+Distinctness is judged against prior *pulls* from the set, not ownership
+— pieces acquired through Gear/Skin crates do not consume the guarantee.
 
 ## Pity — disclosed in the UI, always
 

@@ -813,6 +813,111 @@ the deployed API so the callback reaches the BFF rather than the SPA
 fallback. Without that proxy, "the browser never sees the code" would be true
 in production and false on your machine — the worst kind of difference.
 
+## Part 9 — crates: Pearls get somewhere to go
+
+### What changes
+
+The ledger milestone left the economy half-built: wagering mints Pearls and
+**nothing spends them**. This part closes the loop — earn → wager → mint →
+**spend → own**. Five crate kinds, a starter grant, an inventory, a dex
+with completion bonuses, and four pity mechanisms — all recorded in
+`crate_opens`, the odds-disclosure audit trail `compliance.md` promises.
+
+It is also the first time **content is code**: the 66 garments and 66
+skins ship as versioned JSON (`docs/03-cosmetics/content/data/`), the same
+files the specs and the simulations read. esbuild inlines them into the
+Lambda bundle at synth time — one source of truth with three consumers:
+docs, simulation, runtime.
+
+```
+click ──► handler pre-rolls EVERYTHING (CSPRNG):
+          tier roll · one candidate per tier · set permutation
+                     │  one Data API call
+                     ▼
+          open_crate() under the player row lock:
+          idempotency re-check ► attestation ► starter gate ► balance
+          pity (increment-then-check) ► pick from the pre-rolled draws
+          items row ► crate_opens row (every draw stored) ► dex ► debit
+          completion bonuses ► balance assert ► response recorded
+```
+
+### Concepts before commands
+
+- **Pre-rolled randomness, transactional decisions.** Pity counters must be
+  read under the player lock — two concurrent opens must not both see
+  counter 199 — but the rule from Part 8 stands: one Data API call per
+  economic event, because a lock that spans calls is a lock a dying Lambda
+  leaves behind. So the handler rolls every draw the open *could* need and
+  SQL applies the rules to them under the lock. The unused draws are stored
+  too: an auditor can tell **luck from mercy** by comparing `rolled_tier`,
+  `effective_tier` and the candidates the pity override discarded.
+- **Pity is a state machine, and off-by-one is a compliance bug.** "Within
+  200" must fire ON the 200th open, so the counter increments before the
+  check — exactly what the simulation of record does. The epic drought is
+  the deliberate exception: ten misses, the *eleventh* is forced. A harness
+  drives all four counters to their exact boundaries before any deploy;
+  odds are published, so the boundary is a promise, not a detail.
+- **Weighted selection by cumulative thresholds.** The tier roll is an
+  integer in 1..1,000,000; the rates carve that space into bands (670,000 /
+  250,000 / 70,000 / 10,000 for a basic crate) and the roll lands in one.
+  Exact-decimal arithmetic on both sides; no floating point at the
+  decision site.
+- **Fisher-Yates, not sort-shuffle.** The set permutation uses the swap
+  walk with `crypto.randomInt`. `array.sort(() => Math.random() - 0.5)`
+  is *biased* — some orderings come up more often than others — and bias
+  in a disclosed-odds system is a defect regardless of how pretty the UI
+  is.
+- **The gate is SQL, again.** The first-session guarantee ("your first
+  three opens produce a wearable pair") is enforced by `open_crate()`
+  refusing paid opens until the starter grant is claimed — the same
+  pattern as attestation. The UI hiding buttons is a courtesy; a client
+  that skips the screen skips nothing.
+- **Completion pays inside the completing transaction.** The open that
+  fills a dex page inserts the `one_time_claims` row, the
+  `completion_bonus` ledger row and the balance update in its own
+  transaction. There is no window in which the page is complete and the
+  bonus is owed but unpaid.
+
+### Deploy and verify
+
+```bash
+npm run typecheck && npm run synth   # includes the catalogue validation at bundle time
+npm run deploy                       # migration 006 applies, app stack updates
+```
+
+The selection harness runs before any deploy — catalogue counts, the
+keystone wall, 10⁶ rolls per kind within 0.5% of published rates, pity at
+exact boundaries. The Pearl-flooring bug was found by running numbers, not
+reading code; same discipline here.
+
+### The adversarial checks — this is the deliverable
+
+| Check | What it proves |
+|---|---|
+| Replay an open with the same `Idempotency-Key` → **one** `crate_opens` row, same item | Idempotency holds for item-producing events |
+| Two **concurrent** same-key opens → both get the SAME stored response | The re-check under the lock — the race found (and retrofitted) in the shipped 003 functions |
+| Two concurrent distinct opens → counters advance by exactly 2, balance never negative | The row lock covers pity state, not just money |
+| A paid open before the starter claim → rejected by SQL | The first-session guarantee is structural |
+| 10 basic opens without an Epic → the **11th** is Epic+ with `pity_fired` | The drought boundary, live |
+| 4 set opens (non-Legendary rolls) → 4 distinct pieces, pre-owned or not | Distinctness is against pulls; the keystone alone is exempt |
+| `rolled_tier` ≠ `effective_tier` only where `pity_fired`; `candidates` on every row | The audit trail distinguishes luck from mercy |
+| Complete a dex page → `completion_bonus` ledger row, exactly once | Transactional auto-pay |
+| An unattested player calling `/crates/open` → rejected by SQL | Compliance is server-side |
+| `SUM(ledger_entries)` = cached balances after a session | The assert holds with a new spender |
+| `UPDATE crate_opens` as `oddssea_app` → permission denied | The audit trail is as append-only as the ledger |
+| Basic-crate Legendaries are all Void Weave / cosmic; keystones only from Set Crates | The wall holds |
+
+## Failure modes worth recognising (crates)
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `function open_crate(...) does not exist` from the API | The Data API sends untyped values; Postgres will not cast text→uuid/jsonb or bigint→integer to resolve an overload | Every uuid/integer/jsonb parameter carries a `casts` entry at the call site. Same trap as Part 8, three more parameters to fall into it |
+| A Lambda cold start after a deploy throws `catalogue validation failed: …` | The content JSONs and the code disagree — a family renamed, a count off, rates not summing to 1 | That throw is the design: a bad catalogue fails the first invocation loudly instead of minting wrong items. Fix the data, redeploy |
+| `starter crates must be claimed first` on a paid open | Working as designed — the first-session guarantee is enforced in SQL | Claim the starter grant. If the UI showed paid buttons before the claim, that is a UI bug, not a server one |
+| A set open returned the keystone twice in the first four | Working as designed (~0.24% of chases): the keystone is exempt from first-four distinctness, matching the simulation of record | Nothing. `decisions/0023` — redirecting the second jackpot would make the chase cheaper than the published numbers |
+| Pity fired on open 201/41/101 instead of 200/40/100 | The counter was checked before incrementing — the exact off-by-one the harness exists to catch | Increment-then-check, per `crate-game.py`. The drought alone fires the open after its misses |
+| An internal function returns a real error to the app role instead of `permission denied` | Every new function is born with **built-in PUBLIC execute**, and `ALTER DEFAULT PRIVILEGES IN SCHEMA … REVOKE` does NOT remove it — per-schema default ACLs only subtract what a per-schema grant added. 004's line was a silent no-op; nothing failed until an adversarial check asked | Migration 007: explicit `REVOKE … FROM PUBLIC` on the 006 functions, plus the **global** `ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC`, which genuinely covers future functions. Found in production by the suite — the checks are the deliverable |
+
 ## Failure modes worth recognising (Increment C)
 
 | Symptom | Cause | Fix |
@@ -910,3 +1015,7 @@ Grows as terms first appear. Increment A's entries:
 | **UUIDv7** | A time-ordered UUID. Keys sort by creation time, so an append-heavy ledger writes to the end of its index instead of scattering across it. |
 | **Quantisation carry** | Accumulating a fractional remainder so repeated rounding loses nothing — why a 0.225-Pearl award is not simply floored away. |
 | **Resource server** | Cognito's mechanism for custom API scopes (`oddssea-api/read`…) — the shape this becomes when one protected route grows into many with different permissions. |
+| **Weighted selection / cumulative thresholds** | Mapping one uniform roll onto unequal outcomes by carving the roll space into bands sized by the rates. One draw, exact arithmetic, disclosed odds. |
+| **Pity counter** | Persistent per-player state guaranteeing a rare outcome within N attempts. State, not chance — which is why it lives under the same row lock as the money. |
+| **Fisher-Yates** | The unbiased shuffle: walk the array once, swapping each position with a uniformly chosen earlier-or-equal one. `sort(() => random)` is biased; this is not. |
+| **Content-as-code** | Shipping game content as versioned data files consumed by docs, simulation and runtime alike — one source of truth, three readers, and a version stamp on every roll. |

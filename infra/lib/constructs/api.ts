@@ -256,6 +256,22 @@ export class Api extends Construct {
       authorizationScopes: ['openid'],
     });
 
+    const crateRoutes = httpApi.addRoutes({
+      path: '/crates/{proxy+}',
+      methods: [apigwv2.HttpMethod.POST],
+      integration,
+      authorizer,
+      authorizationScopes: ['openid'],
+    });
+
+    const collectionRoutes = httpApi.addRoutes({
+      path: '/collection',
+      methods: [apigwv2.HttpMethod.GET],
+      integration,
+      authorizer,
+      authorizationScopes: ['openid'],
+    });
+
     // The serving resources. The routes' own references pull the
     // integration, authorizer and Lambda permission along transitively;
     // the default stage is a sibling of all of them and, domainless, the
@@ -268,6 +284,8 @@ export class Api extends Construct {
       ...attestRoutes,
       ...taskRoutes,
       ...betRoutes,
+      ...crateRoutes,
+      ...collectionRoutes,
     ]) {
       readyGroup.add(route);
     }

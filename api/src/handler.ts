@@ -27,6 +27,21 @@ import type {
 import { callFunction, query, DatabaseResumingError } from './db';
 import * as bff from './bff';
 import { json, resuming, type HttpResponse } from './bff/http';
+import {
+  CATALOGUE_VERSION,
+  COMPLETION_BONUSES,
+  CRATE_KINDS,
+  CRATE_TABLES,
+  DROP_TABLE_VERSION,
+  GEAR_PAGES,
+  PITY,
+  SETS,
+  SKIN_PAGES,
+  STARTER_COMPOSITION,
+  itemById,
+  type CrateKind,
+} from './catalogue';
+import { buildOpen, type OpenSpec } from './crates';
 
 /** The content version stamped on every logged roll (data-model.md rule 5). */
 const CONTENT_VERSION = process.env.CONTENT_VERSION ?? '1.1.0';
@@ -85,6 +100,63 @@ function idempotencyKey(event: APIGatewayProxyEventV2WithJWTAuthorizer): string 
   const headers = event.headers ?? {};
   const key = headers['idempotency-key'] ?? headers['Idempotency-Key'];
   return key ?? null;
+}
+
+/**
+ * The parameters open_crate() takes, in ITS declared order — callFunction
+ * emits arguments positionally from key order, so this object's shape is
+ * part of the call contract.
+ */
+function openCrateParams(playerId: string, key: string, spec: OpenSpec) {
+  return {
+    params: {
+      p_player_id: playerId,
+      p_idempotency_key: key,
+      p_kind: spec.kind,
+      p_target_set: spec.targetSet,
+      p_tier_roll: spec.tierRoll,
+      p_roll_max: spec.rollMax,
+      p_rates: JSON.stringify(spec.rates),
+      p_candidates: JSON.stringify(spec.candidates),
+      p_price: spec.pricePearls,
+      p_pity_threshold: spec.pityThreshold,
+      p_drought_threshold: spec.droughtThreshold,
+      p_drop_table_version: DROP_TABLE_VERSION,
+      p_content_version: CATALOGUE_VERSION,
+      p_dex_page_bonus: COMPLETION_BONUSES.dexPageShells,
+      p_set_bonus: COMPLETION_BONUSES.setShells,
+    },
+    casts: {
+      p_player_id: 'uuid',
+      p_tier_roll: 'integer',
+      p_roll_max: 'integer',
+      p_rates: 'jsonb',
+      p_candidates: 'jsonb',
+      p_pity_threshold: 'integer',
+      p_drought_threshold: 'integer',
+    },
+  };
+}
+
+interface OpenResult {
+  catalogueId: string;
+  [key: string]: unknown;
+}
+
+/** Names live in the catalogue, not the database — resolve them on the way out. */
+function decorateOpen(open: OpenResult) {
+  const item = itemById(open.catalogueId);
+  return {
+    ...open,
+    item: {
+      id: item.id,
+      name: item.name,
+      kind: item.kind,
+      tier: item.tier,
+      slot: item.slot,
+      isKeystone: item.isKeystone,
+    },
+  };
 }
 
 export async function handler(
@@ -213,6 +285,154 @@ export async function handler(
         return toResult(json(200, result));
       }
 
+      // ---------------------------------------------------------- crates
+      case 'POST /crates/open': {
+        const key = idempotencyKey(event);
+        if (!key) return toResult(json(400, { error: 'idempotency_key_required' }));
+
+        const body = JSON.parse(event.body ?? '{}') as { kind?: string; targetSet?: string };
+        if (!body.kind || !CRATE_KINDS.includes(body.kind as CrateKind)) {
+          return toResult(json(400, { error: 'unknown_crate_kind' }));
+        }
+        if (body.kind === 'set') {
+          if (!body.targetSet || !SETS.some((s) => s.id === body.targetSet)) {
+            return toResult(json(400, { error: 'unknown_target_set' }));
+          }
+        } else if (body.targetSet) {
+          return toResult(json(400, { error: 'target_set_only_for_set_crates' }));
+        }
+
+        const player = await currentPlayer(event);
+
+        // Every random draw this open could need is rolled HERE (CSPRNG,
+        // the dice precedent) and passed in; the SQL function applies pity
+        // and distinctness to it under the player lock and stores the whole
+        // payload — the draws that lose to a pity override included.
+        const spec = buildOpen(body.kind as CrateKind, body.targetSet);
+        const call = openCrateParams(player.id, key, spec);
+        const result = await callFunction<{ open: OpenResult; shells: number; pearls: number }>(
+          'open_crate',
+          call.params,
+          { casts: call.casts },
+        );
+        return toResult(json(200, { ...result, open: decorateOpen(result.open) }));
+      }
+
+      case 'POST /crates/starter': {
+        const key = idempotencyKey(event);
+        if (!key) return toResult(json(400, { error: 'idempotency_key_required' }));
+
+        const player = await currentPlayer(event);
+
+        // 2 Basic Gear + 1 Basic Skin (currency-model.md's onboarding
+        // grant): the composition that satisfies the first-session
+        // guarantee by construction. The SQL function re-verifies it.
+        const opens = STARTER_COMPOSITION.map((kind) => buildOpen(kind));
+        const result = await callFunction<{ opens: OpenResult[]; shells: number; pearls: number }>(
+          'claim_starter_crates',
+          {
+            p_player_id: player.id,
+            p_idempotency_key: key,
+            p_opens: JSON.stringify(opens),
+            p_drop_table_version: DROP_TABLE_VERSION,
+            p_content_version: CATALOGUE_VERSION,
+            p_dex_page_bonus: COMPLETION_BONUSES.dexPageShells,
+            p_set_bonus: COMPLETION_BONUSES.setShells,
+          },
+          { casts: { p_player_id: 'uuid', p_opens: 'jsonb' } },
+        );
+        return toResult(json(200, { ...result, opens: result.opens.map(decorateOpen) }));
+      }
+
+      case 'GET /collection': {
+        const player = await currentPlayer(event);
+
+        // Plain reads under the SELECT grants — no function needed. The
+        // catalogue (names, pages, sets, prices, thresholds) is resolved
+        // here in Node; the database holds only ownership and counters.
+        const [items, dex, pity, claims] = await Promise.all([
+          query<{ catalogue_id: string; source: string; state: string; acquired_at: string }>(
+            `SELECT catalogue_id, source, state, acquired_at
+               FROM items WHERE player_id = :id::uuid ORDER BY acquired_at`,
+            { id: player.id },
+          ),
+          query<{ catalogue_id: string; first_owned_at: string | null }>(
+            `SELECT catalogue_id, first_owned_at FROM dex_entries WHERE player_id = :id::uuid`,
+            { id: player.id },
+          ),
+          query<{
+            scope: string;
+            target: string;
+            legendary_counter: number;
+            epic_drought: number;
+            total_opens: number;
+          }>(
+            `SELECT scope, target, legendary_counter, epic_drought, total_opens
+               FROM pity_counters WHERE player_id = :id::uuid`,
+            { id: player.id },
+          ),
+          query<{ claim_key: string; amount: number }>(
+            `SELECT claim_key, amount FROM one_time_claims WHERE player_id = :id::uuid`,
+            { id: player.id },
+          ),
+        ]);
+
+        const owned = new Set(
+          dex.filter((d) => d.first_owned_at !== null).map((d) => d.catalogue_id),
+        );
+        const toPage = (page: { key: string; title: string; memberIds: string[] }) => ({
+          key: page.key,
+          title: page.title,
+          total: page.memberIds.length,
+          owned: page.memberIds.filter((id) => owned.has(id)).length,
+          entries: page.memberIds.map((id) => {
+            const item = itemById(id);
+            return { id, name: item.name, tier: item.tier, owned: owned.has(id) };
+          }),
+        });
+
+        return toResult(
+          json(200, {
+            starterClaimed: claims.some((c) => c.claim_key === 'starter_crates'),
+            prices: Object.fromEntries(
+              CRATE_KINDS.map((kind) => [kind, CRATE_TABLES[kind].pricePearls]),
+            ),
+            pity: {
+              counters: pity,
+              thresholds: {
+                basicLegendary: PITY.basicLegendary,
+                premiumLegendary: PITY.premiumLegendary,
+                setKeystone: PITY.setKeystone,
+                epicOrBetter: PITY.epicOrBetter,
+              },
+            },
+            items: items.map((row) => {
+              const item = itemById(row.catalogue_id);
+              return {
+                catalogueId: row.catalogue_id,
+                name: item.name,
+                kind: item.kind,
+                tier: item.tier,
+                slot: item.slot,
+                isKeystone: item.isKeystone,
+                source: row.source,
+                state: row.state,
+                acquiredAt: row.acquired_at,
+              };
+            }),
+            gearPages: GEAR_PAGES.map(toPage),
+            skinPages: SKIN_PAGES.map(toPage),
+            sets: SETS.map((set) => ({
+              id: set.id,
+              name: set.name,
+              total: set.memberIds.length,
+              owned: set.memberIds.filter((id) => owned.has(id)).length,
+              keystoneOwned: owned.has(set.keystoneId),
+            })),
+          }),
+        );
+      }
+
       default:
         return toResult(json(400, { error: `no_handler_for_${route}` }));
     }
@@ -228,9 +448,10 @@ export async function handler(
     // "already claimed today", "insufficient shells", "player has not
     // attested". Surfacing the message is deliberate.
     const message = error instanceof Error ? error.message : String(error);
-    const rule = /already claimed|insufficient|has not attested|below minimum|no contest/i.test(
-      message,
-    );
+    const rule =
+      /already claimed|insufficient|has not attested|below minimum|no contest|must be claimed first/i.test(
+        message,
+      );
     if (rule) {
       // The database's message is the useful part; its wrapper is not. The
       // Data API returns "ERROR: already claimed today; SQLState: 23505" —
