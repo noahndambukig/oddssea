@@ -916,6 +916,7 @@ reading code; same discipline here.
 | `starter crates must be claimed first` on a paid open | Working as designed — the first-session guarantee is enforced in SQL | Claim the starter grant. If the UI showed paid buttons before the claim, that is a UI bug, not a server one |
 | A set open returned the keystone twice in the first four | Working as designed (~0.24% of chases): the keystone is exempt from first-four distinctness, matching the simulation of record | Nothing. `decisions/0023` — redirecting the second jackpot would make the chase cheaper than the published numbers |
 | Pity fired on open 201/41/101 instead of 200/40/100 | The counter was checked before incrementing — the exact off-by-one the harness exists to catch | Increment-then-check, per `crate-game.py`. The drought alone fires the open after its misses |
+| An internal function returns a real error to the app role instead of `permission denied` | Every new function is born with **built-in PUBLIC execute**, and `ALTER DEFAULT PRIVILEGES IN SCHEMA … REVOKE` does NOT remove it — per-schema default ACLs only subtract what a per-schema grant added. 004's line was a silent no-op; nothing failed until an adversarial check asked | Migration 007: explicit `REVOKE … FROM PUBLIC` on the 006 functions, plus the **global** `ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC`, which genuinely covers future functions. Found in production by the suite — the checks are the deliverable |
 
 ## Failure modes worth recognising (Increment C)
 
