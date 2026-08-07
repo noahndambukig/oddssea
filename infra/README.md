@@ -907,6 +907,84 @@ reading code; same discipline here.
 | `UPDATE crate_opens` as `oddssea_app` → permission denied | The audit trail is as append-only as the ledger |
 | Basic-crate Legendaries are all Void Weave / cosmic; keystones only from Set Crates | The wall holds |
 
+## Part 10 — tasks: the faucet catches up
+
+### What changes
+
+Crates gave Pearls somewhere to go; nothing gave players Shells beyond
+the login claim (50–100/day against a simulated ~3,400/week). This part
+ships the faucet the current feature set supports: first-bet-of-the-day,
+two daily challenges from a **shared, stateless draw**, two weeklies, a
+3-step onboarding tour that hands out the starter crates, and the first
+one-time "first". Interim total ≈ 2,575/week — the gap to spec closes as
+deferred tasks unlock with their features (`decisions/0024`), and **no
+number changed anywhere** to ship it.
+
+**Zero new tables.** Bets are the evidence, `task_claims` and
+`one_time_claims` are the records, and progress is *derived* — "7/10
+bets today" is a COUNT at read time, not a stored counter.
+
+### Concepts before commands
+
+- **A shared draw with no storage.** Everyone gets the same daily slate
+  because the slate is a pure function of the UTC date — a sha256-seeded
+  shuffle of the pool. Determinism is the FEATURE here (every Lambda
+  agrees, any past day is recomputable), the exact opposite of the crate
+  rolls, where unpredictability is the feature and the draw is stored
+  evidence. Know which one you are building.
+- **`available_from`, or: a pure function of a data file is only as
+  stable as the file.** A deploy that grows the pool would reshuffle the
+  day in progress — so entries activate on a date, not on deploy, and
+  additions ship effective ≥ deploy+2 so a rollback cannot un-activate a
+  slate either.
+- **Derived progress cannot drift.** There is no counter to forget to
+  increment, no counter to lock, and `place_dice_bet` is untouched. The
+  price: the condition must be recounted at claim time, under the player
+  lock — the panel's numbers are advisory, the function's count decides.
+- **A date parameter is a claim the server must verify.** The function
+  derives today itself and rejects a stale parameter as retryable; the
+  handler recomputes and retries once with the SAME idempotency key.
+  `now()` is transaction-start time — a claim's day is its arrival —
+  matching the login claim's semantics since 003, on purpose.
+- **One idempotency key per economic call.** The key space is global per
+  player, so a key reused across two calls replays the FIRST call's
+  stored response as the second's answer. The tour's step-2 button makes
+  two calls (open starters, claim the step) — two keys, and an "already
+  claimed" from call 1 is treated as success, because it usually means an
+  earlier attempt committed and only the response was lost.
+
+### The adversarial checks — this is the deliverable
+
+Run on TWO test players: a fresh one for virgin-state proofs (the
+unattested rejections, the tour chain in order, the compound step-2
+click), and the funded one for volume work — the fresh player is not
+optional, because the funded player's paid crate opens prove its starter
+is already claimed.
+
+| Check | What it proves |
+|---|---|
+| `challenge:place_bets` at 0 bets → rejected; at 10 → pays 75 | Conditions are recounted server-side at claim |
+| `first_bet` pays and is NOT draw-rejected | The constant daily task lives outside the draw |
+| A forged challenge key not in today's draw → rejected | Draw membership is SQL-enforced |
+| `weekly:volume` pays exactly at bet 100; below → rejected | Threshold success and window arithmetic |
+| `weekly:consistency` needs 4 qualifying days (seeded past + live today) | The daily-set definition, derived from currency-model's own arithmetic |
+| `tour:first-bet` POSTed before steps 1–2 → rejected | The chain is SQL-enforced, not UI-implied |
+| Step 2's compound click → starters open AND the step pays, two keys in `idempotency_keys` | One key per economic call |
+| A claim carrying yesterday's date → handler retries once, invisibly | The rollover path, end to end |
+| Concurrent same-key claims → one ledger row, identical responses | The under-lock re-check, present from birth |
+| `SUM(ledger_entries)` = cached balances | The assert holds with three new payers |
+| `pg_proc.proacl` on all three functions → no PUBLIC entry | 007's global fix, proven on its first new migration |
+
+## Failure modes worth recognising (tasks)
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `first_bet` rejected with "not in today's draw" | The draw-membership check applied to a non-drawn task — `first_bet` is daily but deliberately outside the draw | Membership is checked only for `challenge:%` keys. Round 2 of the plan review caught this in round 1's fix |
+| A player claims a challenge, then it vanishes from the slate mid-day | The pool changed in a deploy and the draw recomputed | `available_from` makes that impossible going forward; claims already made stay honored regardless (the weekly counts claim rows, never draws) |
+| "day rolled over" surfacing to a player | The handler's recompute-and-retry didn't run (or failed twice — genuinely spanning two midnights) | One retry with the same key is correct; twice means something else is wrong. Check the handler's claim dispatch |
+| The tour's step 2 shows "already claimed" and stops | The starter grant committed but the response was lost, and the retry's fresh key hit the duplicate guard | The button treats that rejection as success and proceeds to the tour claim — if a player is stranded here, that fallback regressed |
+| The consistency weekly pays for a day the player skipped | It cannot: qualification is counted from `task_claims` rows dated that day | If it appears to, someone seeded rows — check `ledger_entries` provenance |
+
 ## Failure modes worth recognising (crates)
 
 | Symptom | Cause | Fix |

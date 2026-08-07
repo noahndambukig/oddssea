@@ -108,6 +108,12 @@ export function CratesPanel() {
 
   useEffect(() => {
     void load();
+    // The tour's step-2 button (TasksPanel) can claim the starter crates;
+    // without this, our starter button and inventory sit stale behind a
+    // claim made elsewhere until a page reload.
+    const onChanged = () => void load();
+    window.addEventListener('oddssea:collection-changed', onChanged);
+    return () => window.removeEventListener('oddssea:collection-changed', onChanged);
   }, [load]);
 
   if (!config || !me) return null;

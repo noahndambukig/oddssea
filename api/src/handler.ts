@@ -42,6 +42,15 @@ import {
   type CrateKind,
 } from './catalogue';
 import { buildOpen, type OpenSpec } from './crates';
+import {
+  AMOUNTS,
+  TARGETS,
+  TOUR_STEPS,
+  dailyDraw,
+  utcToday,
+  utcWeekStart,
+  type PoolEntry,
+} from './tasks';
 
 /** The content version stamped on every logged roll (data-model.md rule 5). */
 const CONTENT_VERSION = process.env.CONTENT_VERSION ?? '1.1.0';
@@ -141,6 +150,87 @@ function openCrateParams(playerId: string, key: string, spec: OpenSpec) {
 interface OpenResult {
   catalogueId: string;
   [key: string]: unknown;
+}
+
+/**
+ * One task claim, dispatched to the right SQL function with the numbers
+ * from the shipping copy. The rollover retry lives here: the SQL function
+ * verifies the date parameter against its own clock and RAISEs "day/week
+ * rolled over" when stale — this recomputes and retries ONCE with the
+ * SAME idempotency key (same economic action; the RAISE guarantees
+ * nothing committed). The client never sees the midnight window.
+ */
+async function claimTask(playerId: string, key: string, taskKey: string): Promise<unknown> {
+  const attempt = () => {
+    if (taskKey === 'first_bet' || taskKey.startsWith('challenge:')) {
+      const today = utcToday();
+      const draw = dailyDraw(today);
+      const entry = draw.find((e) => e.key === taskKey);
+      return callFunction(
+        'claim_daily_task',
+        {
+          p_player_id: playerId,
+          p_idempotency_key: key,
+          p_task_key: taskKey,
+          p_claim_date: today,
+          p_draw: JSON.stringify(draw.map((e) => e.key)),
+          p_target: entry?.target ?? 1,
+          p_amount: taskKey === 'first_bet' ? AMOUNTS.firstBet : AMOUNTS.challenge,
+        },
+        {
+          casts: {
+            p_player_id: 'uuid',
+            p_claim_date: 'date',
+            p_draw: 'jsonb',
+            p_target: 'integer',
+          },
+        },
+      );
+    }
+    if (taskKey === 'weekly:volume' || taskKey === 'weekly:consistency') {
+      const volume = taskKey === 'weekly:volume';
+      return callFunction(
+        'claim_weekly_task',
+        {
+          p_player_id: playerId,
+          p_idempotency_key: key,
+          p_task_key: taskKey,
+          p_week_start: utcWeekStart(),
+          p_target: volume ? TARGETS.weeklyVolumeBets : TARGETS.weeklyConsistencyDays,
+          p_set_challenges: volume ? null : TARGETS.dailySetChallenges,
+          p_amount: volume ? AMOUNTS.weeklyVolume : AMOUNTS.weeklyConsistency,
+        },
+        {
+          casts: {
+            p_player_id: 'uuid',
+            p_week_start: 'date',
+            p_target: 'integer',
+            p_set_challenges: 'integer',
+          },
+        },
+      );
+    }
+    return callFunction(
+      'claim_one_time_task',
+      {
+        p_player_id: playerId,
+        p_idempotency_key: key,
+        p_claim_key: taskKey,
+        p_amount: taskKey.startsWith('tour:') ? AMOUNTS.tourStep : AMOUNTS.firstBetGame,
+      },
+      { casts: { p_player_id: 'uuid' } },
+    );
+  };
+
+  try {
+    return await attempt();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/day rolled over|week rolled over/i.test(message)) {
+      return await attempt();
+    }
+    throw error;
+  }
 }
 
 /** Names live in the catalogue, not the database — resolve them on the way out. */
@@ -282,6 +372,161 @@ export async function handler(
             p_roll_max: 'integer',
           },
         });
+        return toResult(json(200, result));
+      }
+
+      // ----------------------------------------------------------- tasks
+      case 'GET /tasks': {
+        const player = await currentPlayer(event);
+        const today = utcToday();
+        const weekStart = utcWeekStart();
+        const draw = dailyDraw(today);
+
+        const [betAgg, weekClaims, oneTimes] = await Promise.all([
+          query<{
+            bets_today: number;
+            wins_today: number;
+            bets_week: number;
+            bets_ever: number;
+            bets_dice: number;
+          }>(
+            `SELECT
+               COUNT(*) FILTER (WHERE (created_at AT TIME ZONE 'UTC')::date = :today::date) AS bets_today,
+               COUNT(*) FILTER (WHERE (created_at AT TIME ZONE 'UTC')::date = :today::date AND payout > 0) AS wins_today,
+               COUNT(*) FILTER (WHERE (created_at AT TIME ZONE 'UTC')::date >= :week::date
+                                  AND (created_at AT TIME ZONE 'UTC')::date < :week::date + 7) AS bets_week,
+               COUNT(*) AS bets_ever,
+               COUNT(*) FILTER (WHERE game = 'dice') AS bets_dice
+               FROM bets WHERE player_id = :id::uuid`,
+            { id: player.id, today, week: weekStart },
+          ),
+          query<{ task_key: string; claim_date: string }>(
+            `SELECT task_key, claim_date FROM task_claims
+              WHERE player_id = :id::uuid AND claim_date >= :week::date`,
+            { id: player.id, week: weekStart },
+          ),
+          query<{ claim_key: string }>(
+            `SELECT claim_key FROM one_time_claims WHERE player_id = :id::uuid`,
+            { id: player.id },
+          ),
+        ]);
+
+        const agg = betAgg[0] ?? { bets_today: 0, wins_today: 0, bets_week: 0, bets_ever: 0, bets_dice: 0 };
+        const claimedToday = new Set(
+          weekClaims.filter((c) => c.claim_date === today).map((c) => c.task_key),
+        );
+        const claimedWeek = new Set(
+          weekClaims.filter((c) => c.claim_date === weekStart).map((c) => c.task_key),
+        );
+        const owned = new Set(oneTimes.map((c) => c.claim_key));
+        const starterClaimed = owned.has('starter_crates');
+
+        // Qualifying days for the consistency weekly — mirrors the SQL
+        // condition, for display only (the function recounts at claim).
+        const byDay = new Map<string, { login: boolean; firstBet: boolean; challenges: number }>();
+        for (const c of weekClaims) {
+          if (c.task_key.startsWith('weekly:')) continue;
+          const day = byDay.get(c.claim_date) ?? { login: false, firstBet: false, challenges: 0 };
+          if (c.task_key === 'login') day.login = true;
+          else if (c.task_key === 'first_bet') day.firstBet = true;
+          else if (c.task_key.startsWith('challenge:')) day.challenges += 1;
+          byDay.set(c.claim_date, day);
+        }
+        const qualifyingDays = [...byDay.values()].filter(
+          (d) => d.login && d.firstBet && d.challenges >= TARGETS.dailySetChallenges,
+        ).length;
+
+        const challengeProgress = (entry: PoolEntry) =>
+          entry.key === 'challenge:win_bet'
+            ? Math.min(Number(agg.wins_today) > 0 ? 1 : 0, entry.target)
+            : Math.min(Number(agg.bets_today), entry.target);
+
+        const tourClaimable: Record<string, boolean> = {
+          'tour:economy-intro': true,
+          'tour:starter-crates': owned.has('tour:economy-intro') && starterClaimed,
+          'tour:first-bet': owned.has('tour:starter-crates') && Number(agg.bets_ever) > 0,
+        };
+
+        return toResult(
+          json(200, {
+            date: today,
+            weekStart,
+            starterClaimed,
+            daily: [
+              {
+                key: 'first_bet',
+                name: 'First bet of the day',
+                amount: AMOUNTS.firstBet,
+                target: 1,
+                progress: Number(agg.bets_today) > 0 ? 1 : 0,
+                claimed: claimedToday.has('first_bet'),
+              },
+              ...draw.map((entry) => ({
+                key: entry.key,
+                name: entry.name,
+                amount: AMOUNTS.challenge,
+                target: entry.target,
+                progress: challengeProgress(entry),
+                claimed: claimedToday.has(entry.key),
+              })),
+            ],
+            weekly: [
+              {
+                key: 'weekly:consistency',
+                name: 'Complete daily sets on 4 different days',
+                amount: AMOUNTS.weeklyConsistency,
+                target: TARGETS.weeklyConsistencyDays,
+                progress: qualifyingDays,
+                claimed: claimedWeek.has('weekly:consistency'),
+              },
+              {
+                key: 'weekly:volume',
+                name: 'Place 100 bets this week',
+                amount: AMOUNTS.weeklyVolume,
+                target: TARGETS.weeklyVolumeBets,
+                progress: Math.min(Number(agg.bets_week), TARGETS.weeklyVolumeBets),
+                claimed: claimedWeek.has('weekly:volume'),
+              },
+            ],
+            oneTime: [
+              ...TOUR_STEPS.map((step) => ({
+                key: step.key,
+                name: step.name,
+                amount: AMOUNTS.tourStep,
+                claimed: owned.has(step.key),
+                claimable: !owned.has(step.key) && tourClaimable[step.key],
+              })),
+              {
+                key: 'first_bet:dice',
+                name: 'First dice bet',
+                amount: AMOUNTS.firstBetGame,
+                claimed: owned.has('first_bet:dice'),
+                claimable: !owned.has('first_bet:dice') && Number(agg.bets_dice) > 0,
+              },
+            ],
+          }),
+        );
+      }
+
+      case 'POST /tasks/claim': {
+        const key = idempotencyKey(event);
+        if (!key) return toResult(json(400, { error: 'idempotency_key_required' }));
+
+        const body = JSON.parse(event.body ?? '{}') as { taskKey?: string };
+        const valid = new Set([
+          'first_bet',
+          ...dailyDraw(utcToday()).map((e) => e.key),
+          'weekly:volume',
+          'weekly:consistency',
+          ...TOUR_STEPS.map((s) => s.key),
+          'first_bet:dice',
+        ]);
+        if (!body.taskKey || !valid.has(body.taskKey)) {
+          return toResult(json(400, { error: 'unknown_task_key' }));
+        }
+
+        const player = await currentPlayer(event);
+        const result = await claimTask(player.id, key, body.taskKey);
         return toResult(json(200, result));
       }
 
@@ -449,7 +694,7 @@ export async function handler(
     // attested". Surfacing the message is deliberate.
     const message = error instanceof Error ? error.message : String(error);
     const rule =
-      /already claimed|insufficient|has not attested|below minimum|no contest|must be claimed first/i.test(
+      /already claimed|insufficient|has not attested|below minimum|no contest|must be claimed first|not yet complete|not in today|rolled over/i.test(
         message,
       );
     if (rule) {
