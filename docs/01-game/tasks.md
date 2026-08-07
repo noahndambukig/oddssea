@@ -2,6 +2,7 @@
 status: agreed
 purpose: Every way a player earns Shells outside of wagering.
 depends-on: core-loop.md, ../decisions/0005-wagering-earns-the-cosmetic-currency.md, ../decisions/0008-no-seasons-in-v1.md, ../decisions/0019-pass-3-on-the-game-specs.md
+implemented-by: ../../api/src/tasks.ts, ../../api/migrations/008_tasks.sql (interim scope — ../decisions/0024)
 ---
 
 # Tasks

@@ -248,6 +248,15 @@ export class Api extends Construct {
       authorizationScopes: ['openid'],
     });
 
+    // The task slate read — the {proxy+} route above is POST-only.
+    const taskSlateRoutes = httpApi.addRoutes({
+      path: '/tasks',
+      methods: [apigwv2.HttpMethod.GET],
+      integration,
+      authorizer,
+      authorizationScopes: ['openid'],
+    });
+
     const betRoutes = httpApi.addRoutes({
       path: '/bets/{proxy+}',
       methods: [apigwv2.HttpMethod.POST],
@@ -283,6 +292,7 @@ export class Api extends Construct {
       ...meRoutes,
       ...attestRoutes,
       ...taskRoutes,
+      ...taskSlateRoutes,
       ...betRoutes,
       ...crateRoutes,
       ...collectionRoutes,
