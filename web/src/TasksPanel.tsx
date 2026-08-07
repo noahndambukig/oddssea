@@ -65,6 +65,16 @@ export function TasksPanel() {
 
   useEffect(() => {
     void load();
+    // Two producers matter to the slate: collection changes (starter
+    // crates, equips — tour claimables) and task-progress changes (bets,
+    // the login claim). Listen to both.
+    const onChanged = () => void load();
+    window.addEventListener('oddssea:collection-changed', onChanged);
+    window.addEventListener('oddssea:tasks-changed', onChanged);
+    return () => {
+      window.removeEventListener('oddssea:collection-changed', onChanged);
+      window.removeEventListener('oddssea:tasks-changed', onChanged);
+    };
   }, [load]);
 
   if (!config || !me) return null;

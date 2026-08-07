@@ -138,7 +138,10 @@ export function CratesPanel() {
   function absorb(opens: OpenResult[], shells: number, pearls: number) {
     applyMe({ ...me!, shells, pearls });
     setLastOpens(opens);
-    void load();
+    // Producers dispatch: our own listener reloads us, and every other
+    // panel showing the collection (closet, tasks) refreshes off the same
+    // event — the dispatch is the single refresh path.
+    window.dispatchEvent(new CustomEvent('oddssea:collection-changed'));
   }
 
   async function claimStarter() {
