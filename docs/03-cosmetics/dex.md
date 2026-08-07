@@ -1,6 +1,7 @@
 ---
 status: agreed
 purpose: The collection interface — structure, silhouettes, variants, discovery credit.
+implemented-by: ../../api/src/catalogue.ts (pages), ../../api/migrations/006_crates.sql (dex_entries, page bonuses)
 ---
 
 # The Dex

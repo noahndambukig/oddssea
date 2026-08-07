@@ -1,6 +1,6 @@
 {
-  "content_version": "1.0.0",
-  "_note": "Docs of record: 03-cosmetics/crates.md (rates, pity) and 02-economy/currency-model.md (prices). This file is the shipping copy the game loads; regenerate docs from it once doc-generation exists (doc-conventions rule 6).",
+  "content_version": "1.1.0",
+  "_note": "Docs of record: 03-cosmetics/crates.md (rates, pity) and 02-economy/currency-model.md (prices, completion bonuses). This file is the shipping copy the game loads; regenerate docs from it once doc-generation exists (doc-conventions rule 6). 1.1.0: completion_bonuses added (additive) so the runtime pays them without restating currency-model.md figures in code.",
   "crates": {
     "basic_gear": { "price_pearls": 70, "rates": { "common": 0.67, "rare": 0.25, "epic": 0.07, "legendary": 0.01 } },
     "basic_skin": { "price_pearls": 90, "rates": { "common": 0.67, "rare": 0.25, "epic": 0.07, "legendary": 0.01 } },
@@ -16,5 +16,6 @@
     "epic_or_better": { "scope": "account_basic_all", "threshold": 10 }
   },
   "salvage_pearls": { "common": 4, "rare": 12, "epic": 45, "legendary": 180 },
-  "direct_price_multiplier": 1.5
+  "direct_price_multiplier": 1.5,
+  "completion_bonuses": { "dex_page_shells": 200, "set_shells": 1500 }
 }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from './auth/AuthContext';
 import { AttestationGate } from './auth/AttestationGate';
 import { GamePanel } from './GamePanel';
+import { CratesPanel } from './CratesPanel';
 
 export default function App() {
   const { status, config, error, profile, me, login, logout } = useAuth();
@@ -83,6 +84,7 @@ export default function App() {
       ) : (
         <>
           <GamePanel />
+          <CratesPanel />
 
           <section className="panel">
             <h2>Session</h2>
