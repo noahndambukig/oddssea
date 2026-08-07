@@ -44,16 +44,34 @@ function aws(args) {
 }
 
 console.log(`Resolving migration function from ${stack}…`);
-const functionName = aws([
-  'cloudformation', 'describe-stacks',
-  '--stack-name', stack,
-  '--region', region,
-  '--query', '"Stacks[0].Outputs[?OutputKey==\'MigrationFunctionName\'].OutputValue"',
-  '--output', 'text',
-]);
 
-if (!functionName || functionName === 'None') {
+/**
+ * No `--query`, and the filtering happens in Node.
+ *
+ * A JMESPath expression contains `[?OutputKey=='…']` — brackets, quotes and
+ * question marks, all of which a shell interprets. Windows needs `shell:
+ * true` to resolve `aws.cmd`, so the argument must be quoted there; Linux
+ * runs without a shell, where those same quotes become part of the
+ * expression and it silently matches nothing. The pipeline failed with
+ * "could not resolve MigrationFunctionName" while the identical command
+ * worked locally.
+ *
+ * Asking for plain JSON removes the shell from the problem entirely: the
+ * arguments contain nothing either platform will touch. This is the THIRD
+ * shell-portability bug in this milestone (`cp`, then `bash`, now quoting),
+ * so the rule is now: build-time commands take only inert arguments and do
+ * their thinking in Node.
+ */
+const described = JSON.parse(
+  aws(['cloudformation', 'describe-stacks', '--stack-name', stack, '--region', region, '--output', 'json']),
+);
+const functionName = described.Stacks?.[0]?.Outputs?.find(
+  (o) => o.OutputKey === 'MigrationFunctionName',
+)?.OutputValue;
+
+if (!functionName) {
   console.error(`ERROR: could not resolve MigrationFunctionName from ${stack}.`);
+  console.error('Outputs present:', (described.Stacks?.[0]?.Outputs ?? []).map((o) => o.OutputKey).join(', '));
   process.exit(1);
 }
 
