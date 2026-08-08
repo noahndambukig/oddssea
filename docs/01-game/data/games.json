@@ -1,0 +1,24 @@
+{
+  "content_version": "1.0.0",
+  "_note": "Doc of record: 02-economy/currency-model.md (edge, min stake, the plinko tables and their exact RTPs) and 01-game/game-modes.md (structure). This file is the shipping copy the game loads (doc-conventions rule 6). Each plinko rtp is REDUNDANT on purpose: api/src/games.ts recomputes it from rows+multipliers at module load and fails the deploy on any mismatch, so the published number cannot drift from the table that produces it.",
+  "instant": { "edge": 0.03, "min_stake_shells": 10 },
+  "plinko": {
+    "profiles": {
+      "low": {
+        "rows": 8,
+        "multipliers": [4.4, 1.9, 1.1, 0.85, 0.75, 0.85, 1.1, 1.9, 4.4],
+        "rtp": 0.970703125
+      },
+      "mid": {
+        "rows": 12,
+        "multipliers": [26, 9, 3.1, 1.7, 1.0, 0.7, 0.49, 0.7, 1.0, 1.7, 3.1, 9, 26],
+        "rtp": 0.970888671875
+      },
+      "high": {
+        "rows": 16,
+        "multipliers": [220, 55, 14, 5, 2.2, 1.1, 1.0, 0.6, 0.4, 0.6, 1.0, 1.1, 2.2, 5, 14, 55, 220],
+        "rtp": 0.97152099609375
+      }
+    }
+  }
+}

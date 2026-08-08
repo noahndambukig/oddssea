@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { useAuth, type Me } from './auth/AuthContext';
 import { call, newIdempotencyKey, ApiError } from './api-client';
+// Content-as-code's third consumer (docs, api, web): the SAME shipping
+// copy the server prices against renders the disclosure here — the
+// multiplier tables and exact RTPs cannot diverge between what the UI
+// promises and what SQL pays (game-modes.md rule 1).
+import gamesData from '../../docs/01-game/data/games.json';
 
 /**
  * The first real economy: a balance, a faucet, and a sink.
@@ -26,6 +31,10 @@ export function GamePanel() {
   const [stake, setStake] = useState(10);
   const [threshold, setThreshold] = useState(50);
   const [direction, setDirection] = useState<'over' | 'under'>('under');
+
+  const [plinkoRisk, setPlinkoRisk] = useState<'low' | 'mid' | 'high'>('low');
+  const [plinkoStake, setPlinkoStake] = useState(10);
+  const [lastDrop, setLastDrop] = useState<PlinkoResult | null>(null);
 
   if (!config || !me) return null;
 
@@ -102,6 +111,23 @@ export function GamePanel() {
       // Bets change task PROGRESS (first-bet, place-N, win-a-bet, weekly
       // volume), not the collection — hence the second event: overloading
       // collection-changed would refetch the whole collection per roll.
+      window.dispatchEvent(new CustomEvent('oddssea:tasks-changed'));
+    }
+  }
+
+  async function drop() {
+    const key = newIdempotencyKey();
+    const result = await run('plinko', () =>
+      call<PlinkoResult>(config!, '/bets/plinko', {
+        method: 'POST',
+        idempotencyKey: key,
+        body: { stake: plinkoStake, risk: plinkoRisk },
+        onWaking: () => setWaking(true),
+      }),
+    );
+    if (result) {
+      applyMe({ ...me!, shells: result.shells, pearls: result.pearls });
+      setLastDrop(result);
       window.dispatchEvent(new CustomEvent('oddssea:tasks-changed'));
     }
   }
@@ -194,6 +220,75 @@ export function GamePanel() {
         )}
       </section>
 
+      <section className="panel">
+        <h2>Plinko</h2>
+        <p className="muted">
+          Pick a risk, pick a stake, drop. The ball bounces once per row —
+          a fair coin each time — and the bucket pays its published
+          multiplier. Every number below is the one the server pays
+          against.
+        </p>
+        <div className="actions">
+          <label className="attest">
+            <span>Risk</span>
+            <select
+              value={plinkoRisk}
+              onChange={(e) => setPlinkoRisk(e.target.value as 'low' | 'mid' | 'high')}
+            >
+              {(['low', 'mid', 'high'] as const).map((r) => (
+                <option key={r} value={r}>
+                  {r} ({gamesData.plinko.profiles[r].rows} rows, max ×
+                  {Math.max(...gamesData.plinko.profiles[r].multipliers)})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="attest">
+            <span>Stake</span>
+            <input
+              type="number"
+              min={gamesData.instant.min_stake_shells}
+              step={10}
+              value={plinkoStake}
+              onChange={(e) => setPlinkoStake(Number(e.target.value))}
+            />
+          </label>
+          <button onClick={drop} disabled={busy !== null}>
+            {busy === 'plinko' ? 'Dropping…' : 'Drop'}
+          </button>
+        </div>
+
+        {lastDrop && (
+          <div className="result">
+            <p className="muted">
+              Bucket <code>{lastDrop.bucket}</code> of{' '}
+              <code>{lastDrop.rows}</code> — ×<code>{lastDrop.multiplier}</code>
+              {lastDrop.won ? ' (win)' : ''}. Payout <code>{lastDrop.payout}</code> Shells,{' '}
+              <code>{lastDrop.pearlsAwarded}</code> Pearls
+              {lastDrop.pearlsPending > 0 && (
+                <> (plus <code>{lastDrop.pearlsPending}</code> carried)</>
+              )}
+              .
+            </p>
+          </div>
+        )}
+
+        <details>
+          <summary>
+            Published odds — {plinkoRisk}: RTP{' '}
+            {(gamesData.plinko.profiles[plinkoRisk].rtp * 100).toFixed(4)}% (house edge{' '}
+            {(gamesData.instant.edge * 100).toFixed(0)}% nominal)
+          </summary>
+          <ul className="muted">
+            {gamesData.plinko.profiles[plinkoRisk].multipliers.map((m, k) => (
+              <li key={k}>
+                bucket {k}: ×{m} — {(bucketProbability(gamesData.plinko.profiles[plinkoRisk].rows, k) * 100).toFixed(3)}%
+              </li>
+            ))}
+          </ul>
+        </details>
+      </section>
+
       {waking && (
         <p className="muted">
           Waking the database — it pauses when nobody is playing, which is why
@@ -222,6 +317,26 @@ interface DiceResult {
   pearlsPending: number;
   shells: number;
   pearls: number;
+}
+
+interface PlinkoResult {
+  won: boolean;
+  rows: number;
+  bucket: number;
+  multiplier: number;
+  payout: number;
+  pearlsAwarded: number;
+  pearlsPending: number;
+  shells: number;
+  pearls: number;
+}
+
+/** C(rows,k)/2^rows — a derivation from the published table's shape, not a
+ * restated number. */
+function bucketProbability(rows: number, k: number): number {
+  let c = 1;
+  for (let i = 0; i < k; i += 1) c = (c * (rows - i)) / (i + 1);
+  return Math.round(c) / 2 ** rows;
 }
 
 export type { Me };

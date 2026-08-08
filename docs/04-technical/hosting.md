@@ -19,24 +19,24 @@ without re-architecture.
 |---|---|---|
 | Frontend + cosmetic assets | S3 + CloudFront | Static bundle behind a CDN; the grayscale+mask art pipeline keeps assets small |
 | API | Lambda + API Gateway | Scales to zero while the game is being built; no servers to keep warm |
-| Database | Aurora Serverless v2 (Postgres) | The economy is a ledger — wagers, marketplace escrow and crate opens need ACID transactions. **Minimum capacity 0**, so an idle cluster pauses and bills nothing but storage |
-| Database access | **RDS Data API** | An HTTPS endpoint instead of a connection. No VPC attachment for Lambda, therefore no NAT gateway; no connection pool to exhaust; and — decisively — nothing holding a connection open, so the cluster can actually reach zero (`decisions/0020`) |
+| Database | Aurora Serverless v2 (Postgres) | The economy is a ledger — wagers, marketplace escrow and crate opens need ACID transactions. **Minimum capacity 0.5 — always on for the rest of dev** (`decisions/0026`): funded by AWS credits, no cold starts, scheduled work is legal. The plan of record migrates off Aurora before launch, so everything stays plain Postgres |
+| Database access | **RDS Data API** | An HTTPS endpoint instead of a connection. No VPC attachment for Lambda, therefore no NAT gateway; no connection pool to exhaust. Chosen for auto-pause (`decisions/0020`), kept for simplicity now that the pause is gone (`decisions/0026`) |
 | Auth | Cognito + a **backend-for-frontend** | Managed accounts; the BFF owns the token exchange and the refresh cookie once a balance exists (`decisions/0017`) |
 | Live odds / bet feeds | API Gateway WebSockets — **later** | Shape depends on the unwritten core loop |
 
 Single region plus the CDN. Infrastructure is defined as code (CDK) from the
 first deploy, so environments are reproducible.
 
-**Scale-to-zero is the cost model, not a detail.** `data-model.md` puts hot
-game state — live tables, wheels, open bets — in Postgres precisely because
-Lambdas have no resident memory, which makes every request a database
-round-trip. At real volume that argues for pooling; at this volume the
-database is idle almost always, and the only figure that matters is what an
-idle cluster costs. Anything holding a persistent connection prevents the
-pause, which is why RDS Proxy is **not** used here — AWS lists it by name
-among the conditions that block auto-pause. The accepted cost: a paused
-cluster takes ~15 seconds to resume, or 30+ after a day asleep, so clients
-set long timeouts and the UI says so honestly.
+**The cost model is now "credits pay for always-on" (`decisions/0026`).**
+Through the ledger, crates, tasks and closet milestones the cluster ran
+scale-to-zero (minimum capacity 0, 10-minute auto-pause, ~15-second
+resume, `decisions/0020`) and the client machinery built for it — 503 +
+Retry-After, idempotent retries, the waking screen — remains in place,
+now exercised only by restarts and failovers. At minimum capacity 0.5 the
+cluster answers instantly and scheduled work no longer sabotages a pause.
+`data-model.md` still puts hot game state in Postgres because Lambdas
+have no resident memory; at real volume that argues for pooling, and the
+pre-launch database migration is where that gets decided.
 
 The database arrives with the ledger; nothing before it touches one.
 
@@ -65,16 +65,17 @@ The database arrives with the ledger; nothing before it touches one.
   path requires a decision entry and legal review first.
 - No multi-region, no Kubernetes, no microservices. One API, one database,
   until scale forces otherwise.
-- **No connection pooling, and no VPC-attached compute.** Both follow from
-  the Data API choice above rather than being independent positions. If
-  traffic ever makes per-statement HTTP round trips the bottleneck, the exit
-  is a VPC with RDS Proxy — and the price of that exit is the idle bill,
-  paid every hour of every day the game is quiet (`decisions/0020`).
-- **No scheduled work that touches the database on a timer.** A cron that
-  wakes an idle cluster converts "pauses almost always" into "awake most of
-  the time", and it does so silently. Reconciliation is event-driven for
-  this reason: drift can only occur when the ledger is written, so the check
-  belongs on the write path, not on a clock.
+- **No connection pooling, and no VPC-attached compute.** Chosen for
+  auto-pause (`decisions/0020`), kept for simplicity: no pool to exhaust,
+  no VPC networking, no NAT. If traffic ever makes per-statement HTTP
+  round trips the bottleneck, that is a question for the pre-launch
+  database migration (`decisions/0026`), not for this stack.
+- **Scheduled database work is now permitted but not preferred**
+  (`decisions/0026` removed the pause a cron would have sabotaged).
+  Reconciliation stays event-driven regardless — drift can only occur
+  when the ledger is written, so the check belongs on the write path, not
+  on a clock — and time-indexed lazy rounds remain the first choice for
+  shared games where they also buy provable fairness.
 
 ## Open questions
 

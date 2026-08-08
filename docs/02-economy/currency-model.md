@@ -109,6 +109,22 @@ committed, ~27,300/week casual**.
 | Race field | 6–8 racers from a roster of ~14 |
 | Race overround | the races edge above |
 
+### Plinko — the published tables (`decisions/0027`)
+
+Binomial drop over `rows` fair pegs; bucket k lands with probability
+C(rows,k)/2^rows. Tables are priced against the 3% instant edge above,
+rounded player-favorably to display-clean multipliers; the **exact RTP
+is published in the UI** (`01-game/game-modes.md` rule 1) and the
+shipping copy (`01-game/data/games.json`) is recomputed against its own
+table at every deploy. A "win" — for the Pearl win-share and the
+win-a-bet challenge alike — is a bucket paying **more than stake**.
+
+| Profile | Rows | Multipliers (symmetric, centre bold) | Exact RTP | Max |
+|---|---|---|---|---|
+| low | 8 | 4.4 · 1.9 · 1.1 · 0.85 · **0.75** | 97.0703125% | 4.4× |
+| mid | 12 | 26 · 9 · 3.1 · 1.7 · 1.0 · 0.7 · **0.49** | 97.0888671875% | 26× |
+| high | 16 | 220 · 55 · 14 · 5 · 2.2 · 1.1 · 1.0 · 0.6 · **0.4** | 97.152099609375% | 220× |
+
 ### Lottery — validated by simulation
 
 The lottery is **positive-EV by design** (`decisions/0014`): pot = 1.5×

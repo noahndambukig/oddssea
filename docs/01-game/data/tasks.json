@@ -1,5 +1,5 @@
 {
-  "content_version": "1.1.0",
+  "content_version": "1.2.0",
   "_note": "Docs of record: 01-game/tasks.md (structure) and 02-economy/currency-model.md (amounts, targets). This file is the shipping copy the game loads (doc-conventions rule 6). Pool entries carry available_from (UTC date): the daily draw filters on it, so a mid-day deploy cannot reshuffle a day in progress. Operational rule: pool additions ship available_from >= deploy day + 2 (decisions/0024). 1.1.0: the tour gains its equip step and feature_firsts arrives (additive, decisions/0025).",
   "daily": {
     "first_bet": { "amount_shells": 25, "name": "First bet of the day" }
@@ -11,7 +11,9 @@
       { "key": "challenge:place_bets", "kind": "volume", "target": 10,
         "name": "Place 10 bets", "available_from": "2026-08-01" },
       { "key": "challenge:win_bet", "kind": "outcome", "target": 1,
-        "name": "Win a bet", "available_from": "2026-08-01" }
+        "name": "Win a bet", "available_from": "2026-08-01" },
+      { "key": "challenge:play_two_games", "kind": "volume", "target": 2,
+        "name": "Play 2 different games", "available_from": "2026-08-09" }
     ]
   },
   "weekly": {

@@ -1026,6 +1026,60 @@ item in the closet's selects without a reload; `UPDATE loadouts` as the
 app role → permission denied while the function path works — mutable by
 design, but only through the single door.
 
+## Part 12 — plinko: the second game, priced in the open
+
+### What changes
+
+Dice proved the pipeline; plinko proves it GENERALIZES — and it forced
+two corrections that only a second game could. The milestone also pays
+migration 010 (the tour-chain contract from Part 11's expand/contract)
+and grows the daily draw to three challenges via an effective date.
+
+### Concepts before commands
+
+- **Plinko is literally coin flips.** The ball bounces once per row,
+  left or right with equal probability — so the bucket is the POPCOUNT
+  of one random integer's bits, and bucket k lands with probability
+  C(rows,k)/2^rows, the binomial distribution. One CSPRNG draw is the
+  whole roll; SQL derives the bucket (`bit_count`) rather than trusting
+  it.
+- **Pricing a table against a published edge, closed-form.** RTP =
+  Σ p_k·m_k needs no Monte Carlo — it is a dot product. The tables were
+  solved to sit within 0.16% of the 3% edge with display-clean
+  multipliers, rounded player-favorably, and the EXACT RTP is published.
+  The shipping copy's `rtp` is recomputed from its own table at every
+  module load: a published number with a tripwire against its own
+  derivation. That tripwire caught a real hand-derivation error before
+  the file was an hour old.
+- **A predicate can be accidentally correct.** "Win a bet" was
+  `payout > 0` — true exactly as long as no game paid partial returns.
+  Plinko's 0.4× bucket returns something on a loss, so the predicate
+  became `payout > stake` (profit is a win) before a loss could
+  complete an outcome challenge.
+- **Content growth by effective date, for real this time.** The
+  play-two-games challenge entered the pool dated deploy+2 — the
+  machinery Part 10 built on principle doing its first real job: the
+  entry is provably inert until its date, then the shared draw is three.
+
+### The adversarial checks — this is the deliverable
+
+Highlights: the tour chain rejects out-of-order claims (010, live); a
+losing plinko bucket does NOT satisfy win-a-bet while a >1× bucket does;
+`bit_count(path)` recomputed by admin equals every stored bucket; a
+sub-1 bucket writes a `bet_payout` row of `floor(stake·m)`; the slate
+shows distinct-games 1/2 after two same-game bets; the panel renders
+multipliers, probabilities and exact RTP from the same shipping copy the
+server prices against.
+
+## Failure modes worth recognising (plinko)
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Deploy's first invocation throws `games validation failed: published rtp != computed` | The table and its published RTP disagree — a multiplier edit without recomputing, or vice versa | That throw is the point. Recompute (the harness prints exact values) and ship both together |
+| A loss completed the win-a-bet challenge | The predicate reverted to `payout > 0` somewhere | It is `payout > stake` in `claim_daily_task` AND the slate aggregate — both, or the button lies |
+| The daily draw changed size mid-day | A pool entry shipped with `available_from` ≤ deploy day | The 0024 rule is deploy+2; the harness proves draws around the boundary are bit-identical |
+| Plinko pays the wrong bucket | The stored bucket diverged from `bit_count(path)` — which cannot happen through the function, since the bucket is derived under the lock | If observed, someone wrote `bet_plinko` directly; check provenance, the app role cannot |
+
 ## Failure modes worth recognising (the closet)
 
 | Symptom | Cause | Fix |

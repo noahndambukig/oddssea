@@ -54,6 +54,7 @@ import {
   utcWeekStart,
   type PoolEntry,
 } from './tasks';
+import { INSTANT, PLINKO_PROFILES, PLINKO_RISKS, GAMES_VERSION, type PlinkoRisk } from './games';
 
 /** The content version stamped on every logged roll (data-model.md rule 5). */
 const CONTENT_VERSION = process.env.CONTENT_VERSION ?? '1.1.0';
@@ -385,6 +386,47 @@ export async function handler(
         return toResult(json(200, result));
       }
 
+      case 'POST /bets/plinko': {
+        const key = idempotencyKey(event);
+        if (!key) return toResult(json(400, { error: 'idempotency_key_required' }));
+
+        const body = JSON.parse(event.body ?? '{}') as { stake?: number; risk?: string };
+        if (!body.stake || !body.risk || !PLINKO_RISKS.includes(body.risk as PlinkoRisk)) {
+          return toResult(json(400, { error: 'stake_and_risk_required' }));
+        }
+        const profile = PLINKO_PROFILES[body.risk as PlinkoRisk];
+
+        const player = await currentPlayer(event);
+
+        // One CSPRNG draw whose bits are the ball's left/rights. SQL
+        // derives the bucket (popcount) — the value that decided the
+        // outcome is the value stored, and the outcome is derived from
+        // it, never trusted.
+        const path = randomInt(0, 2 ** profile.rows);
+
+        const result = await callFunction('place_plinko_bet', {
+          p_player_id: player.id,
+          p_idempotency_key: key,
+          p_stake: Math.floor(body.stake),
+          p_risk: body.risk,
+          p_rows: profile.rows,
+          p_path: path,
+          p_multipliers: JSON.stringify(profile.multipliers),
+          p_edge: INSTANT.edge,
+          p_min_stake: INSTANT.minStakeShells,
+          p_content_version: GAMES_VERSION,
+        }, {
+          casts: {
+            p_player_id: 'uuid',
+            p_rows: 'integer',
+            p_path: 'integer',
+            p_multipliers: 'jsonb',
+            p_edge: 'numeric',
+          },
+        });
+        return toResult(json(200, result));
+      }
+
       // ----------------------------------------------------------- tasks
       case 'GET /tasks': {
         const player = await currentPlayer(event);
@@ -396,17 +438,21 @@ export async function handler(
           query<{
             bets_today: number;
             wins_today: number;
+            games_today: number;
             bets_week: number;
             bets_ever: number;
             bets_dice: number;
+            bets_plinko: number;
           }>(
             `SELECT
                COUNT(*) FILTER (WHERE (created_at AT TIME ZONE 'UTC')::date = :today::date) AS bets_today,
-               COUNT(*) FILTER (WHERE (created_at AT TIME ZONE 'UTC')::date = :today::date AND payout > 0) AS wins_today,
+               COUNT(*) FILTER (WHERE (created_at AT TIME ZONE 'UTC')::date = :today::date AND payout > stake) AS wins_today,
+               COUNT(DISTINCT game) FILTER (WHERE (created_at AT TIME ZONE 'UTC')::date = :today::date) AS games_today,
                COUNT(*) FILTER (WHERE (created_at AT TIME ZONE 'UTC')::date >= :week::date
                                   AND (created_at AT TIME ZONE 'UTC')::date < :week::date + 7) AS bets_week,
                COUNT(*) AS bets_ever,
-               COUNT(*) FILTER (WHERE game = 'dice') AS bets_dice
+               COUNT(*) FILTER (WHERE game = 'dice') AS bets_dice,
+               COUNT(*) FILTER (WHERE game = 'plinko') AS bets_plinko
                FROM bets WHERE player_id = :id::uuid`,
             { id: player.id, today, week: weekStart },
           ),
@@ -421,7 +467,10 @@ export async function handler(
           ),
         ]);
 
-        const agg = betAgg[0] ?? { bets_today: 0, wins_today: 0, bets_week: 0, bets_ever: 0, bets_dice: 0 };
+        const agg = betAgg[0] ?? {
+          bets_today: 0, wins_today: 0, games_today: 0, bets_week: 0,
+          bets_ever: 0, bets_dice: 0, bets_plinko: 0,
+        };
         const claimedToday = new Set(
           weekClaims.filter((c) => c.claim_date === today).map((c) => c.task_key),
         );
@@ -446,10 +495,19 @@ export async function handler(
           (d) => d.login && d.firstBet && d.challenges >= TARGETS.dailySetChallenges,
         ).length;
 
-        const challengeProgress = (entry: PoolEntry) =>
-          entry.key === 'challenge:win_bet'
-            ? Math.min(Number(agg.wins_today) > 0 ? 1 : 0, entry.target)
-            : Math.min(Number(agg.bets_today), entry.target);
+        // Each challenge's progress reads ITS OWN aggregate — a shared
+        // fallthrough would show 2/2 distinct games after two same-game
+        // bets while SQL rightly refuses (the advisory numbers must not
+        // lie).
+        const challengeProgress = (entry: PoolEntry) => {
+          if (entry.key === 'challenge:win_bet') {
+            return Math.min(Number(agg.wins_today) > 0 ? 1 : 0, entry.target);
+          }
+          if (entry.key === 'challenge:play_two_games') {
+            return Math.min(Number(agg.games_today), entry.target);
+          }
+          return Math.min(Number(agg.bets_today), entry.target);
+        };
 
         // Claimable flags read the SAME evidence as the SQL conditions:
         // equip credit is players.first_equipped_at (an event timestamp),
@@ -520,6 +578,13 @@ export async function handler(
                 claimed: owned.has('first_bet:dice'),
                 claimable: !owned.has('first_bet:dice') && Number(agg.bets_dice) > 0,
               },
+              {
+                key: 'first_bet:plinko',
+                name: 'First plinko drop',
+                amount: AMOUNTS.firstBetGame,
+                claimed: owned.has('first_bet:plinko'),
+                claimable: !owned.has('first_bet:plinko') && Number(agg.bets_plinko) > 0,
+              },
               ...FEATURE_FIRSTS.map((f) => ({
                 key: f.key,
                 name: f.name,
@@ -544,6 +609,7 @@ export async function handler(
           'weekly:consistency',
           ...TOUR_STEPS.map((s) => s.key),
           'first_bet:dice',
+          'first_bet:plinko',
           ...FEATURE_FIRSTS.map((f) => f.key),
         ]);
         if (!body.taskKey || !valid.has(body.taskKey)) {
