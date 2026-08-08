@@ -98,6 +98,20 @@ export class Api extends Construct {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    /**
+     * The crash round secret (decisions/0028): every round's bust is
+     * HMAC-SHA256(this secret, round index), so the secret IS the game's
+     * fairness evidence — any stored bust can be re-derived from it.
+     * RETAIN, because deleting the stack must not delete the ability to
+     * audit history (the ledger survives via SNAPSHOT; this must match).
+     * Fetched at runtime by ARN, never passed as an env VALUE — the BFF
+     * client-secret rationale.
+     */
+    const crashRoundSecret = new secretsmanager.Secret(this, 'CrashRoundSecret', {
+      description: 'HMAC key deriving every crash round bust (oddssea, decisions/0028)',
+    });
+    crashRoundSecret.applyRemovalPolicy(cdk.RemovalPolicy.RETAIN);
+
     // TypeScript in, bundled JS out — esbuild (an infra devDependency, so
     // bundling never silently falls back to Docker) transpiles
     // api/src/handler.ts at synth time. The Lambda ships only what the
@@ -123,6 +137,7 @@ export class Api extends Construct {
         BFF_CLIENT_ID: bffClientId,
         // The ARN, not the value — see api/src/bff/index.ts.
         BFF_CLIENT_SECRET_ARN: bffClientSecret.secretArn,
+        CRASH_SECRET_ARN: crashRoundSecret.secretArn,
         APP_URL: appUrl,
       },
     });
@@ -155,6 +170,7 @@ export class Api extends Construct {
     );
     appSecret.grantRead(handler);
     bffClientSecret.grantRead(handler);
+    crashRoundSecret.grantRead(handler);
 
     /**
      * CORS, spelled out. The browser only lets a cross-origin page read a
@@ -289,6 +305,16 @@ export class Api extends Construct {
       authorizationScopes: ['openid'],
     });
 
+    // The crash round view — the flight poll's target. A read: the
+    // POST verbs (place, cashout, settle) all live under /bets/{proxy+}.
+    const crashRoutes = httpApi.addRoutes({
+      path: '/crash/round',
+      methods: [apigwv2.HttpMethod.GET],
+      integration,
+      authorizer,
+      authorizationScopes: ['openid'],
+    });
+
     // The serving resources. The routes' own references pull the
     // integration, authorizer and Lambda permission along transitively;
     // the default stage is a sibling of all of them and, domainless, the
@@ -305,6 +331,7 @@ export class Api extends Construct {
       ...crateRoutes,
       ...collectionRoutes,
       ...closetRoutes,
+      ...crashRoutes,
     ]) {
       readyGroup.add(route);
     }

@@ -34,6 +34,14 @@ export const INSTANT = {
   minStakeShells: gamesData.instant.min_stake_shells,
 } as const;
 
+export const CRASH = {
+  periodSeconds: gamesData.crash.period_seconds,
+  bettingSeconds: gamesData.crash.betting_seconds,
+  doubleEverySeconds: gamesData.crash.double_every_seconds,
+  minCashout: gamesData.crash.min_cashout,
+  maxMultiplier: gamesData.crash.max_multiplier,
+} as const;
+
 export const GAMES_VERSION = gamesData.content_version;
 
 /** C(n,k) — exact for the row counts in play. */
@@ -86,4 +94,23 @@ function assertGames(condition: boolean, message: string): void {
       `${risk}: RTP ${computed} outside the 3%-edge band`,
     );
   }
+
+  // Crash geometry (decisions/0028). The bust law itself is two constants
+  // (edge, cap) — what can silently break is the round's SHAPE: the cap
+  // must be reachable inside the minute or a top-end bust never resolves
+  // on the curve players watch.
+  const capTime =
+    CRASH.bettingSeconds + CRASH.doubleEverySeconds * Math.log2(CRASH.maxMultiplier);
+  assertGames(
+    capTime < CRASH.periodSeconds - 5,
+    `crash: cap ${CRASH.maxMultiplier}x reached at ${capTime}s — must clear the ` +
+      `${CRASH.periodSeconds}s round with 5s margin`,
+  );
+  assertGames(CRASH.minCashout > 1, 'crash: min cashout must exceed 1.00 (a 1.00x cashout is a free round-trip)');
+  assertGames(
+    Math.round(CRASH.minCashout * 100) === CRASH.minCashout * 100,
+    'crash: min cashout must sit on the cent grid',
+  );
+  assertGames(CRASH.bettingSeconds > 0 && CRASH.bettingSeconds < CRASH.periodSeconds, 'crash: betting window must fit the round');
+  assertGames(CRASH.maxMultiplier > CRASH.minCashout, 'crash: cap below the minimum target');
 })();

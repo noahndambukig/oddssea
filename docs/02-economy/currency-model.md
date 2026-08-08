@@ -125,6 +125,27 @@ win-a-bet challenge alike — is a bucket paying **more than stake**.
 | mid | 12 | 26 · 9 · 3.1 · 1.7 · 1.0 · 0.7 · **0.49** | 97.0888671875% | 26× |
 | high | 16 | 220 · 55 · 14 · 5 · 2.2 · 1.1 · 1.0 · 0.6 · **0.4** | 97.152099609375% | 220× |
 
+### Crash — the bust law (`decisions/0028`)
+
+The bust multiplier is drawn so that **`P(bust ≥ m) = 0.97/m`** — the
+3% instant edge above, expressed as an inverse-CDF law — then floored
+to 2 decimals and clamped to the cap in the table above. Because
+flooring cannot cross a 2-decimal boundary, every cash-out target on
+the cent grid from **1.01× (the minimum)** up to the cap has an
+identical **multiplier RTP of exactly 97.00%**; ties (`target = bust`)
+pay, in both the live and auto verbs. A bust of 1.00× — probability
+≈ 4% — has no winners.
+
+**Shell payouts floor to whole Shells** on top of that law:
+`floor(stake × multiplier)`, so the effective Shell RTP sits at or
+below 97.00% and converges to it as stakes grow (worst case just under
+1 Shell per payout). Both facts are published in the UI disclosure.
+The draw itself: `U = (first 48 bits of HMAC-SHA256(secret,
+round_index) + 1) / 2^48`, `bust = clamp(1.00, floor2(0.97/U), cap)` —
+deterministic per round, recomputable for audit
+(`04-technical/hosting.md`; timings are game feel and live in
+`01-game/game-modes.md`; shipping copy `01-game/data/games.json`).
+
 ### Lottery — validated by simulation
 
 The lottery is **positive-EV by design** (`decisions/0014`): pot = 1.5×
