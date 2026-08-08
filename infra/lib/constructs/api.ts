@@ -315,6 +315,16 @@ export class Api extends Construct {
       authorizationScopes: ['openid'],
     });
 
+    // The roulette table view — same shape; the wheel shares the crash
+    // round secret (domain-separated messages), so no new secret here.
+    const rouletteRoutes = httpApi.addRoutes({
+      path: '/roulette/round',
+      methods: [apigwv2.HttpMethod.GET],
+      integration,
+      authorizer,
+      authorizationScopes: ['openid'],
+    });
+
     // The serving resources. The routes' own references pull the
     // integration, authorizer and Lambda permission along transitively;
     // the default stage is a sibling of all of them and, domainless, the
@@ -332,6 +342,7 @@ export class Api extends Construct {
       ...collectionRoutes,
       ...closetRoutes,
       ...crashRoutes,
+      ...rouletteRoutes,
     ]) {
       readyGroup.add(route);
     }

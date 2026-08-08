@@ -72,9 +72,15 @@ those common columns carry a detail row rather than bending them:
   raises this hand's stake), outcome, payout. **A split is two rows**,
   which is the only honest way to model one bet becoming two hands.
 
-**rounds** — shared-event games (races, crash, roulette spins, lottery
-draws): schedule, state (`betting`|`running`|`settled`), result, RNG
-roll(s), content version.
+**rounds** — shared-event games (races, lottery draws): schedule, state
+(`betting`|`running`|`settled`), result, RNG roll(s), content version.
+**Crash and roulette deliberately have no rounds rows**
+(`decisions/0028`, `0029`): their rounds are derived from the clock and
+their results from HMAC(secret, round index), so the round exists as
+arithmetic and only bets are stored (`bet_crash.round_index`,
+`bet_roulette.round_index` carry the roll's space; the stored outcome
+is recomputable). Races and lottery may still warrant rows — decided
+when they are built.
 
 **races** — round subtype: the field (racer references), **the racer
 weights in force when odds were set**, closing odds per racer, finish
@@ -97,7 +103,11 @@ the shoe shuffle seed and every card dealt, every wheel spin. These are
 the highest-volume random outcomes in the game and Rule 5 covers them
 like any other. Hot state lives in Postgres for v1 — Lambdas have no
 resident memory; a cache tier is a scale-time addition, not a launch
-requirement.
+requirement. **Roulette launches as a single shared table with no room
+rows** (`decisions/0029`): rooms are the scale-out path, entering the
+result derivation as `'roulette:' + room + ':' + index` when they
+exist. `blackjack_tables` stands as sketched — blackjack is genuinely
+stateful and is not built yet.
 
 ## Racers
 

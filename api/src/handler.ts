@@ -54,8 +54,26 @@ import {
   utcWeekStart,
   type PoolEntry,
 } from './tasks';
-import { CRASH, INSTANT, PLINKO_PROFILES, PLINKO_RISKS, GAMES_VERSION, type PlinkoRisk } from './games';
+import {
+  CRASH,
+  INSTANT,
+  PLINKO_PROFILES,
+  PLINKO_RISKS,
+  ROULETTE,
+  ROULETTE_COVERAGE,
+  GAMES_VERSION,
+  type PlinkoRisk,
+} from './games';
 import { crashBust, roundElapsed, roundIndex, tBustSeconds } from './crash';
+import {
+  FIXED_TYPES,
+  NUMBER_TYPES,
+  canonicalSelection,
+  rouletteElapsed,
+  roulettePocket,
+  rouletteRound,
+  type RouletteBetType,
+} from './roulette';
 
 /** The content version stamped on every logged roll (data-model.md rule 5). */
 const CONTENT_VERSION = process.env.CONTENT_VERSION ?? '1.1.0';
@@ -188,6 +206,58 @@ async function decidedBusts(playerId: string, secret: string): Promise<Record<st
     if (decided) busts[String(idx)] = bust;
   }
   return busts;
+}
+
+// ---------------------------------------------------------------- roulette
+//
+// Same doctrine as crash, 40-second period, same retained secret with
+// domain-separated messages. The settle pre-read may run on Lambda's
+// clock (SQL re-derives decidedness and simply doesn't apply an early
+// map entry); only the ROUND VIEW must not — see GET /roulette/round.
+
+async function decidedPockets(playerId: string, secret: string): Promise<Record<string, number>> {
+  const rows = await query<{ round_index: string }>(
+    `SELECT DISTINCT br.round_index
+       FROM bets b JOIN bet_roulette br ON br.bet_id = b.id
+      WHERE b.player_id = :id::uuid AND b.state = 'open'`,
+    { id: playerId },
+  );
+
+  const nowS = Date.now() / 1000;
+  const current = rouletteRound(nowS);
+  const elapsed = rouletteElapsed(nowS);
+
+  const pockets: Record<string, number> = {};
+  for (const row of rows) {
+    const idx = Number(row.round_index);
+    const decided = idx < current || (idx === current && elapsed >= ROULETTE.bettingSeconds);
+    if (decided) pockets[String(idx)] = roulettePocket(secret, idx);
+  }
+  return pockets;
+}
+
+async function settleRoulette(playerId: string, secret: string): Promise<Record<string, unknown>> {
+  const attempt = async () => {
+    const pockets = await decidedPockets(playerId, secret);
+    return (await callFunction('settle_roulette_bets', {
+      p_player_id: playerId,
+      p_pockets: JSON.stringify(pockets),
+      p_edge: ROULETTE.edge,
+      p_betting_s: ROULETTE.bettingSeconds,
+      p_period_s: ROULETTE.periodSeconds,
+    }, {
+      casts: {
+        p_player_id: 'uuid',
+        p_pockets: 'jsonb',
+        p_edge: 'numeric',
+        p_betting_s: 'integer',
+        p_period_s: 'integer',
+      },
+    })) as Record<string, unknown>;
+  };
+  const result = await attempt();
+  if (Array.isArray(result.skipped) && result.skipped.length > 0) return attempt();
+  return result;
 }
 
 /** One keyless settle call: naturally idempotent, derived-state response. */
@@ -639,6 +709,166 @@ export async function handler(
         return toResult(json(200, result));
       }
 
+      case 'POST /bets/roulette': {
+        const key = idempotencyKey(event);
+        if (!key) return toResult(json(400, { error: 'idempotency_key_required' }));
+
+        const body = JSON.parse(event.body ?? '{}') as {
+          stake?: number;
+          betType?: string;
+          selection?: number[];
+        };
+        if (!body.stake || !body.betType) {
+          return toResult(json(400, { error: 'stake_and_bet_type_required' }));
+        }
+        const betType = body.betType as RouletteBetType;
+        if (![...NUMBER_TYPES, ...FIXED_TYPES].includes(betType)) {
+          return toResult(json(400, { error: 'unknown_bet_type' }));
+        }
+
+        // Legality lives HERE, against the derived registry; SQL checks
+        // shape and price; the audit re-derives everything.
+        const selection = canonicalSelection(betType, body.selection);
+        if (!selection) {
+          return toResult(json(400, { error: 'illegal_selection' }));
+        }
+
+        const player = await currentPlayer(event);
+        const secret = await crashSecret();
+        const pockets = await decidedPockets(player.id, secret);
+
+        // Declared parameter order, exactly (the crash lesson).
+        const result = (await callFunction('place_roulette_bet', {
+          p_player_id: player.id,
+          p_idempotency_key: key,
+          p_stake: Math.floor(body.stake),
+          p_bet_type: betType,
+          p_selection: JSON.stringify(selection),
+          p_coverage: ROULETTE_COVERAGE[betType],
+          p_pockets: JSON.stringify(pockets),
+          p_edge: ROULETTE.edge,
+          p_min_stake: INSTANT.minStakeShells,
+          p_betting_s: ROULETTE.bettingSeconds,
+          p_period_s: ROULETTE.periodSeconds,
+          p_content_version: GAMES_VERSION,
+        }, {
+          casts: {
+            p_player_id: 'uuid',
+            p_selection: 'jsonb',
+            p_coverage: 'integer',
+            p_pockets: 'jsonb',
+            p_edge: 'numeric',
+            p_betting_s: 'integer',
+            p_period_s: 'integer',
+          },
+        })) as Record<string, unknown>;
+
+        if (Array.isArray(result.skipped) && result.skipped.length > 0) {
+          const settled = await settleRoulette(player.id, secret);
+          return toResult(json(200, {
+            ...result,
+            skipped: settled.skipped,
+            shells: settled.shells,
+            pearls: settled.pearls,
+          }));
+        }
+        return toResult(json(200, result));
+      }
+
+      case 'POST /bets/roulette/settle': {
+        const player = await currentPlayer(event);
+        const secret = await crashSecret();
+        const result = await settleRoulette(player.id, secret);
+        return toResult(json(200, result));
+      }
+
+      case 'GET /roulette/round': {
+        const player = await currentPlayer(event);
+        const secret = await crashSecret();
+
+        // THE ONE AUTHORITY CLOCK (decisions/0029): every time fact in
+        // this response — phase, reveal, serverEpochMs — derives from
+        // Postgres's now(), the same clock that closes betting and
+        // rules settlement. A reveal gated on Lambda's clock would be
+        // an exploit window exactly as wide as the skew: unlike
+        // crash's bust, a prematurely revealed pocket is directly
+        // bankable at 36x.
+        const [epochRows, mine, feed] = await Promise.all([
+          query<{ epoch: string }>(`SELECT extract(epoch FROM now())::text AS epoch`, {}),
+          query<{ id: string; stake: number; bet_type: string; selection: string; round_index: string }>(
+            `SELECT b.id, b.stake, br.bet_type, br.selection::text, br.round_index
+               FROM bets b JOIN bet_roulette br ON br.bet_id = b.id
+              WHERE b.player_id = :id::uuid AND b.state = 'open'
+              ORDER BY b.id`,
+            { id: player.id },
+          ),
+          // The window is keyed off Lambda's clock but WIDENED one
+          // round each way, so whichever round the DB clock (the
+          // authority below) lands on is covered even at a boundary.
+          query<{ round_index: string; bet_type: string; selection: string; stake: number }>(
+            `SELECT br.round_index, br.bet_type, br.selection::text, b.stake
+               FROM bets b JOIN bet_roulette br ON br.bet_id = b.id
+              WHERE br.round_index BETWEEN :lo AND :hi
+              ORDER BY b.id
+              LIMIT 601`,
+            {
+              lo: rouletteRound(Date.now() / 1000) - 2,
+              hi: rouletteRound(Date.now() / 1000) + 1,
+            },
+          ),
+        ]);
+
+        const epochS = Number(epochRows[0].epoch);
+        const idx = rouletteRound(epochS);
+        const elapsed = rouletteElapsed(epochS);
+        const spun = elapsed >= ROULETTE.bettingSeconds;
+        const chipsOf = (round: number) => {
+          const rows = feed.filter((f) => Number(f.round_index) === round);
+          return {
+            chips: rows.slice(0, 200).map((f) => ({
+              betType: f.bet_type,
+              selection: JSON.parse(f.selection) as number[],
+              stake: Number(f.stake),
+            })),
+            truncated: rows.length > 200,
+          };
+        };
+        const current = chipsOf(idx);
+        const last = chipsOf(idx - 1);
+
+        return toResult(
+          json(200, {
+            serverEpochMs: Math.round(epochS * 1000),
+            round: {
+              index: idx,
+              phase: spun ? 'result' : 'betting',
+              ...(spun ? { pocket: roulettePocket(secret, idx) } : {}),
+              secondsLeftInWindow: spun ? 0 : Number((ROULETTE.bettingSeconds - elapsed).toFixed(3)),
+              secondsToNextRound: Number((ROULETTE.periodSeconds - elapsed).toFixed(3)),
+              chips: current.chips,
+              chipsTruncated: current.truncated,
+            },
+            myOpenBets: mine.map((b) => ({
+              betId: b.id,
+              stake: Number(b.stake),
+              betType: b.bet_type,
+              selection: JSON.parse(b.selection) as number[],
+              roundIndex: Number(b.round_index),
+            })),
+            pendingSettlement: mine.some((b) => {
+              const bIdx = Number(b.round_index);
+              return bIdx < idx || (bIdx === idx && spun);
+            }),
+            lastRound: {
+              index: idx - 1,
+              pocket: roulettePocket(secret, idx - 1),
+              chips: last.chips,
+              chipsTruncated: last.truncated,
+            },
+          }),
+        );
+      }
+
       case 'GET /crash/round': {
         const player = await currentPlayer(event);
         const secret = await crashSecret();
@@ -728,6 +958,7 @@ export async function handler(
             bets_dice: number;
             bets_plinko: number;
             bets_crash: number;
+            bets_roulette: number;
           }>(
             `SELECT
                COUNT(*) FILTER (WHERE (created_at AT TIME ZONE 'UTC')::date = :today::date) AS bets_today,
@@ -738,7 +969,8 @@ export async function handler(
                COUNT(*) AS bets_ever,
                COUNT(*) FILTER (WHERE game = 'dice') AS bets_dice,
                COUNT(*) FILTER (WHERE game = 'plinko') AS bets_plinko,
-               COUNT(*) FILTER (WHERE game = 'crash') AS bets_crash
+               COUNT(*) FILTER (WHERE game = 'crash') AS bets_crash,
+               COUNT(*) FILTER (WHERE game = 'roulette') AS bets_roulette
                FROM bets WHERE player_id = :id::uuid`,
             { id: player.id, today, week: weekStart },
           ),
@@ -755,7 +987,7 @@ export async function handler(
 
         const agg = betAgg[0] ?? {
           bets_today: 0, wins_today: 0, games_today: 0, bets_week: 0,
-          bets_ever: 0, bets_dice: 0, bets_plinko: 0, bets_crash: 0,
+          bets_ever: 0, bets_dice: 0, bets_plinko: 0, bets_crash: 0, bets_roulette: 0,
         };
         const claimedToday = new Set(
           weekClaims.filter((c) => c.claim_date === today).map((c) => c.task_key),
@@ -878,6 +1110,13 @@ export async function handler(
                 claimed: owned.has('first_bet:crash'),
                 claimable: !owned.has('first_bet:crash') && Number(agg.bets_crash) > 0,
               },
+              {
+                key: 'first_bet:roulette',
+                name: 'First roulette spin',
+                amount: AMOUNTS.firstBetGame,
+                claimed: owned.has('first_bet:roulette'),
+                claimable: !owned.has('first_bet:roulette') && Number(agg.bets_roulette) > 0,
+              },
               ...FEATURE_FIRSTS.map((f) => ({
                 key: f.key,
                 name: f.name,
@@ -904,6 +1143,7 @@ export async function handler(
           'first_bet:dice',
           'first_bet:plinko',
           'first_bet:crash',
+          'first_bet:roulette',
           ...FEATURE_FIRSTS.map((f) => f.key),
         ]);
         if (!body.taskKey || !valid.has(body.taskKey)) {
@@ -1164,7 +1404,7 @@ export async function handler(
     // attested". Surfacing the message is deliberate.
     const message = error instanceof Error ? error.message : String(error);
     const rule =
-      /already claimed|insufficient|has not attested|below minimum|no contest|must be claimed first|not yet complete|not in today|rolled over|not owned|already riding|target outside|cent grid|window closed|not flying|too early|round over|bet not open/i.test(
+      /already claimed|insufficient|has not attested|below minimum|no contest|must be claimed first|not yet complete|not in today|rolled over|not owned|already riding|target outside|cent grid|window closed|not flying|too early|round over|bet not open|unknown bet type|bad selection/i.test(
         message,
       );
     if (rule) {

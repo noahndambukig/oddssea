@@ -146,6 +146,22 @@ deterministic per round, recomputable for audit
 (`04-technical/hosting.md`; timings are game feel and live in
 `01-game/game-modes.md`; shipping copy `01-game/data/games.json`).
 
+### Roulette — one identity prices the table (`decisions/0029`)
+
+European single-zero: the edge is **exactly 1/37 ≈ 2.7027%** (the 2.7%
+in the games table above, made precise). Every standard bet pays
+**`36 / coverage`** — straight 36×, split 18×, street 12×, corner 9×,
+six-line 6×, dozen/column 3×, even-money 2× — so every bet type at
+every stake returns **exactly `36/37 = 97.2973…%`** in expectation.
+Payouts are integer multiples of stake, so unlike crash there is **no
+whole-Shell floor caveat**: the Shell RTP equals the published RTP,
+exactly, always. The pocket is drawn uniformly — exactly 1/37 per
+pocket, by deterministic rejection over the 48-bit HMAC grid (a naked
+`mod 37` would carry modulo bias) — from
+`HMAC-SHA256(secret, 'roulette:' + round_index)`, recomputable for
+audit. Timings are game feel (`01-game/game-modes.md`); shipping copy
+`01-game/data/games.json`.
+
 ### Lottery — validated by simulation
 
 The lottery is **positive-EV by design** (`decisions/0014`): pot = 1.5×

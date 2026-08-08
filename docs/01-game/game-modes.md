@@ -58,7 +58,13 @@ recomputable (implemented by `data/games.json`).
 European single-zero wheel (this is exactly the table-game edge in the
 currency model). One shared wheel per room on a ~40-second spin timer;
 every seated player's chips are visible on the same layout. Standard
-inside and outside bets.
+inside and outside bets. Timing (game feel, `decisions/0029`): each
+round is 40 seconds — betting for the first 30, the spin at :30, the
+result standing until the next round; rounds are derived from the
+clock like crash's (`decisions/0028`), so no scheduler exists and
+every pocket is recomputable. At launch there is a single shared
+table; rooms are the scale-out path (implemented by
+`data/games.json`).
 
 ## Blackjack — communal tables
 
