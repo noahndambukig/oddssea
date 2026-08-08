@@ -139,8 +139,12 @@ async function crashSecret(): Promise<string> {
   return cachedCrashSecret;
 }
 
-/** Timing/pricing parameters every crash SQL call carries — from the
- * shipping copy, never hardcoded here or in SQL. */
+/** Timing/pricing parameters for settle_crash_bets — from the shipping
+ * copy, never hardcoded here or in SQL. ORDER-SENSITIVE: callFunction
+ * is positional in object insertion order, and this spread matches
+ * settle's declared tail exactly (edge, betting, double, period). The
+ * place/cashout calls interleave these mid-signature, so they spell
+ * every parameter out instead of spreading. */
 const CRASH_CALL_PARAMS = {
   p_edge: INSTANT.edge,
   p_betting_s: CRASH.bettingSeconds,
@@ -531,17 +535,25 @@ export async function handler(
         const secret = await crashSecret();
         const busts = await decidedBusts(player.id, secret);
 
+        // Parameter ORDER matters: callFunction builds the call
+        // positionally from object insertion order, so this object
+        // mirrors the declared signature exactly — a spread that appends
+        // shared params at the end resolves to a function that does not
+        // exist (the crates-era overload trap, positional edition).
         const result = (await callFunction('place_crash_bet', {
           p_player_id: player.id,
           p_idempotency_key: key,
           p_stake: Math.floor(body.stake),
           p_auto_target: body.autoTarget ?? null,
           p_busts: JSON.stringify(busts),
+          p_edge: INSTANT.edge,
           p_min_stake: INSTANT.minStakeShells,
           p_min_target: CRASH.minCashout,
           p_cap: CRASH.maxMultiplier,
+          p_betting_s: CRASH.bettingSeconds,
+          p_double_s: CRASH.doubleEverySeconds,
+          p_period_s: CRASH.periodSeconds,
           p_content_version: GAMES_VERSION,
-          ...CRASH_CALL_PARAMS,
         }, {
           casts: {
             ...CRASH_CALL_CASTS,
@@ -590,14 +602,18 @@ export async function handler(
         const secret = await crashSecret();
         const bust = crashBust(secret, Number(betRows[0].round_index));
 
+        // Declared order, exactly (see the place call's comment).
         const result = await callFunction('cashout_crash_bet', {
           p_player_id: player.id,
           p_idempotency_key: key,
           p_bet_id: body.betId,
           p_bust: bust,
+          p_edge: INSTANT.edge,
           p_min_target: CRASH.minCashout,
           p_cap: CRASH.maxMultiplier,
-          ...CRASH_CALL_PARAMS,
+          p_betting_s: CRASH.bettingSeconds,
+          p_double_s: CRASH.doubleEverySeconds,
+          p_period_s: CRASH.periodSeconds,
         }, {
           casts: {
             p_player_id: 'uuid',
@@ -1148,7 +1164,7 @@ export async function handler(
     // attested". Surfacing the message is deliberate.
     const message = error instanceof Error ? error.message : String(error);
     const rule =
-      /already claimed|insufficient|has not attested|below minimum|no contest|must be claimed first|not yet complete|not in today|rolled over|not owned/i.test(
+      /already claimed|insufficient|has not attested|below minimum|no contest|must be claimed first|not yet complete|not in today|rolled over|not owned|already riding|target outside|cent grid|window closed|not flying|too early|round over|bet not open/i.test(
         message,
       );
     if (rule) {
