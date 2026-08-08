@@ -1,6 +1,6 @@
 {
-  "content_version": "1.1.0",
-  "_note": "Doc of record: 02-economy/currency-model.md (edge, min stake, the plinko tables and their exact RTPs, the crash bust law and cap) and 01-game/game-modes.md (structure and timings). This file is the shipping copy the game loads (doc-conventions rule 6). Each plinko rtp is REDUNDANT on purpose: api/src/games.ts recomputes it from rows+multipliers at module load and fails the deploy on any mismatch, so the published number cannot drift from the table that produces it. The crash block gets the same treatment for its geometry: games.ts fails the deploy unless the cap is reachable inside the round with margin.",
+  "content_version": "1.2.0",
+  "_note": "Doc of record: 02-economy/currency-model.md (edge, min stake, the plinko tables and their exact RTPs, the crash bust law and cap, the roulette payout table) and 01-game/game-modes.md (structure and timings). This file is the shipping copy the game loads (doc-conventions rule 6). Each plinko rtp is REDUNDANT on purpose: api/src/games.ts recomputes it from rows+multipliers at module load and fails the deploy on any mismatch, so the published number cannot drift from the table that produces it. The crash block gets the same treatment for its geometry (the cap must be reachable inside the round with margin), and roulette for its pricing identity: every payout must equal 36 / the bet type's coverage.",
   "instant": { "edge": 0.03, "min_stake_shells": 10 },
   "crash": {
     "period_seconds": 60,
@@ -8,6 +8,25 @@
     "double_every_seconds": 4,
     "min_cashout": 1.01,
     "max_multiplier": 1000
+  },
+  "roulette": {
+    "period_seconds": 40,
+    "betting_seconds": 30,
+    "payouts": {
+      "straight": 36,
+      "split": 18,
+      "street": 12,
+      "corner": 9,
+      "six_line": 6,
+      "dozen": 3,
+      "column": 3,
+      "red": 2,
+      "black": 2,
+      "odd": 2,
+      "even": 2,
+      "high": 2,
+      "low": 2
+    }
   },
   "plinko": {
     "profiles": {

@@ -41,6 +41,14 @@ export function GamePanel() {
   const [crashView, setCrashView] = useState<CrashRoundView | null>(null);
   const [lastCrash, setLastCrash] = useState<CrashOutcome | null>(null);
   const [, setCrashTick] = useState(0);
+
+  const [rouletteStake, setRouletteStake] = useState(10);
+  const [rouletteType, setRouletteType] = useState('red');
+  const [rouletteNumbers, setRouletteNumbers] = useState('');
+  const [rouletteView, setRouletteView] = useState<RouletteRoundView | null>(null);
+  const [rouletteResults, setRouletteResults] = useState<RouletteOutcome[]>([]);
+  const rouletteBusy = useRef(false);
+  const rouletteSettling = useRef(false);
   // The server's clock is the round's clock: the offset learned from
   // every poll corrects this browser's, so the window countdown and the
   // curve animation line up with what SQL will actually rule.
@@ -95,13 +103,50 @@ export function GamePanel() {
       }
     };
 
+    // The roulette poll rides the same heartbeat — same doctrine, its
+    // own state. The wheel's clock facts come from the SERVER response
+    // (Postgres's now() — the clock that closes betting), so the panel
+    // renders countdowns from serverEpochMs + local delta, never from
+    // this machine's clock alone.
+    const pollRoulette = async () => {
+      if (!meRef.current || rouletteBusy.current) return;
+      rouletteBusy.current = true;
+      try {
+        const view = await call<RouletteRoundView>(config, '/roulette/round');
+        if (!alive) return;
+        setRouletteView(view);
+
+        if (view.pendingSettlement && !rouletteSettling.current) {
+          rouletteSettling.current = true;
+          try {
+            const settled = await call<RouletteSettleResult>(config, '/bets/roulette/settle', {
+              method: 'POST',
+            });
+            if (alive && meRef.current) {
+              applyMe({ ...meRef.current, shells: settled.shells, pearls: settled.pearls });
+              setRouletteResults(settled.recent.slice(0, 6));
+              window.dispatchEvent(new CustomEvent('oddssea:tasks-changed'));
+            }
+          } finally {
+            rouletteSettling.current = false;
+          }
+        }
+      } catch {
+        // Background poll: errors surface on the next player action.
+      } finally {
+        rouletteBusy.current = false;
+      }
+    };
+
     const interval = setInterval(() => {
       if (!alive) return;
       setCrashTick((t) => t + 1);
       beat += 1;
       if (beat % 4 === 0) void poll();
+      if (beat % 4 === 2) void pollRoulette();
     }, 250);
     void poll();
+    void pollRoulette();
 
     return () => {
       alive = false;
@@ -235,6 +280,30 @@ export function GamePanel() {
     if (result) {
       applyMe({ ...me!, shells: result.shells, pearls: result.pearls });
       setLastCrash(result);
+      window.dispatchEvent(new CustomEvent('oddssea:tasks-changed'));
+    }
+  }
+
+  async function placeChip() {
+    const key = newIdempotencyKey();
+    const needsNumbers = !['red', 'black', 'odd', 'even', 'high', 'low'].includes(rouletteType);
+    const selection = needsNumbers
+      ? rouletteNumbers.split(',').map((s) => Number(s.trim())).filter((n) => !Number.isNaN(n))
+      : undefined;
+    const result = await run('roulette', () =>
+      call<RoulettePlaceResult>(config!, '/bets/roulette', {
+        method: 'POST',
+        idempotencyKey: key,
+        body: {
+          stake: rouletteStake,
+          betType: rouletteType,
+          ...(selection ? { selection } : {}),
+        },
+        onWaking: () => setWaking(true),
+      }),
+    );
+    if (result) {
+      applyMe({ ...me!, shells: result.shells, pearls: result.pearls });
       window.dispatchEvent(new CustomEvent('oddssea:tasks-changed'));
     }
   }
@@ -555,6 +624,138 @@ export function GamePanel() {
         );
       })()}
 
+      <section className="panel">
+        <h2>Roulette</h2>
+        <p className="muted">
+          One shared European wheel, a spin every {gamesData.roulette.period_seconds} seconds:
+          bet for the first {gamesData.roulette.betting_seconds}, then the pocket lands. Stack
+          as many chips as you like — every player's chips sit on the same table.
+        </p>
+
+        {rouletteView && rouletteView.round.phase === 'betting' && (
+          <>
+            <p>
+              Round <code>{rouletteView.round.index}</code> — betting closes in{' '}
+              <code>{Math.max(0, Math.round(rouletteView.round.secondsLeftInWindow))}s</code>
+            </p>
+            <div className="actions">
+              <label className="attest">
+                <span>Bet</span>
+                <select value={rouletteType} onChange={(e) => setRouletteType(e.target.value)}>
+                  {Object.keys(gamesData.roulette.payouts).map((t) => (
+                    <option key={t} value={t}>
+                      {t} (×{gamesData.roulette.payouts[t as keyof typeof gamesData.roulette.payouts]})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {!['red', 'black', 'odd', 'even', 'high', 'low'].includes(rouletteType) && (
+                <label className="attest">
+                  <span>Numbers (comma-separated)</span>
+                  <input
+                    type="text"
+                    placeholder="e.g. 17 or 16,17"
+                    value={rouletteNumbers}
+                    onChange={(e) => setRouletteNumbers(e.target.value)}
+                  />
+                </label>
+              )}
+              <label className="attest">
+                <span>Stake</span>
+                <input
+                  type="number"
+                  min={gamesData.instant.min_stake_shells}
+                  step={10}
+                  value={rouletteStake}
+                  onChange={(e) => setRouletteStake(Number(e.target.value))}
+                />
+              </label>
+              <button onClick={placeChip} disabled={busy !== null}>
+                {busy === 'roulette' ? 'Placing…' : 'Place chip'}
+              </button>
+            </div>
+          </>
+        )}
+
+        {rouletteView && rouletteView.round.phase === 'result' && (
+          <p>
+            Pocket <strong>{rouletteView.round.pocket}</strong> — next spin in{' '}
+            <code>{Math.max(0, Math.round(rouletteView.round.secondsToNextRound))}s</code>
+          </p>
+        )}
+
+        {rouletteView && rouletteView.myOpenBets.length > 0 && (
+          <p className="muted">
+            My chips this round:{' '}
+            {rouletteView.myOpenBets.map((b) => (
+              <span key={b.betId}>
+                <code>
+                  {b.betType}
+                  {b.selection.length <= 6 ? ` [${b.selection.join(',')}]` : ''} ·{b.stake}
+                </code>{' '}
+              </span>
+            ))}
+          </p>
+        )}
+
+        {rouletteView && rouletteView.round.chips.length > 0 && (
+          <p className="muted">
+            On the table:{' '}
+            {rouletteView.round.chips.map((c, i) => (
+              <span key={i}>
+                <code>
+                  {c.betType}
+                  {c.selection.length <= 6 ? ` [${c.selection.join(',')}]` : ''} ·{c.stake}
+                </code>{' '}
+              </span>
+            ))}
+            {rouletteView.round.chipsTruncated && <em>(and more)</em>}
+          </p>
+        )}
+
+        {rouletteResults.length > 0 && (
+          <div className="result">
+            <p className="muted">
+              Last results:{' '}
+              {rouletteResults.map((r) => (
+                <span key={r.betId}>
+                  <code>
+                    {r.betType} → {r.won ? `won ${r.payout}` : 'lost'}
+                  </code>{' '}
+                </span>
+              ))}
+            </p>
+          </div>
+        )}
+
+        {rouletteView && (
+          <p className="muted">
+            Last round: pocket <code>{rouletteView.lastRound.pocket}</code>
+          </p>
+        )}
+
+        <details>
+          <summary>
+            Published odds — RTP exactly 36/37 ≈ 97.2973% at every bet type and stake
+          </summary>
+          <ul className="muted">
+            {Object.entries(gamesData.roulette.payouts).map(([t, p]) => (
+              <li key={t}>
+                {t}: pays ×{p} — covers {36 / p} of 37 pockets (
+                {((36 / p / 37) * 100).toFixed(2)}%)
+              </li>
+            ))}
+          </ul>
+          <p className="muted">
+            Payouts are exact integer multiples of stake — the Shell return equals the
+            published return, always. Each pocket is drawn with probability exactly 1/37:
+            U from HMAC-SHA256(server secret, "roulette:" + round number), accepted only
+            below the largest multiple of 37 (a plain modulo would carry bias) — every
+            past pocket is recomputable from the recipe.
+          </p>
+        </details>
+      </section>
+
       {waking && (
         <p className="muted">
           Waking the database — it pauses when nobody is playing, which is why
@@ -636,6 +837,61 @@ interface CrashPlaceResult {
   betId: string;
   roundIndex: number;
   autoTarget: number | null;
+  stake: number;
+  skipped: number[];
+  shells: number;
+  pearls: number;
+}
+
+interface RouletteChip {
+  betType: string;
+  selection: number[];
+  stake: number;
+}
+
+interface RouletteRoundView {
+  serverEpochMs: number;
+  round: {
+    index: number;
+    phase: 'betting' | 'result';
+    pocket?: number;
+    secondsLeftInWindow: number;
+    secondsToNextRound: number;
+    chips: RouletteChip[];
+    chipsTruncated: boolean;
+  };
+  myOpenBets: (RouletteChip & { betId: string; roundIndex: number })[];
+  pendingSettlement: boolean;
+  lastRound: { index: number; pocket: number; chips: RouletteChip[]; chipsTruncated: boolean };
+}
+
+interface RouletteOutcome {
+  betId: string;
+  roundIndex: number;
+  betType: string;
+  selection: number[];
+  pocket: number;
+  won: boolean;
+  stake: number;
+  payout: number;
+  pearlsAwarded: number;
+}
+
+interface RouletteSettleResult {
+  recent: RouletteOutcome[];
+  recentTruncated: boolean;
+  skipped: number[];
+  shells: number;
+  pearls: number;
+  pearlsPending: number;
+}
+
+interface RoulettePlaceResult {
+  betId: string;
+  roundIndex: number;
+  betType: string;
+  selection: number[];
+  decimalOdds: number;
   stake: number;
   skipped: number[];
   shells: number;

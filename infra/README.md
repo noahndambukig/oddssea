@@ -1137,6 +1137,79 @@ a deliberately empty busts map settles nothing and reports the skipped
 round; every stored bust equals its HMAC recompute; player B's cashout
 appears in player A's next flight poll.
 
+## Part 14 — roulette: one formula, one clock
+
+### What changes
+
+The fourth game reuses Part 13's rounds-as-arithmetic doctrine at a
+40-second period and adds the shape races will need — many bets, one
+outcome — plus the rule-of-three extraction: `settle_round_bet`, the
+shared settlement ledger core, born private and used forward.
+
+### Concepts before commands
+
+- **One identity prices the whole table.** Every standard roulette bet
+  pays `36/coverage` and covers `coverage/37` of the wheel, so RTP is
+  exactly 36/37 for every type at every stake — and because payouts
+  are integer multiples of stake, the Shell return IS the published
+  return, no floor caveat. One load-checked identity replaces
+  thirteen memorised numbers.
+- **Modulo bias, and rejection sampling.** `HMAC mod 37` is not
+  uniform: 2^48 isn't divisible by 37, so some pockets would own one
+  extra grid value. Deterministic rejection — accept only below the
+  largest multiple of 37, else re-hash with an attempt suffix — makes
+  the published 1/37 exact. The rejection probability is ~5×10⁻¹⁵;
+  the point is the *claim*, not the frequency.
+- **Domain separation.** One retained secret serves crash and
+  roulette because their messages never collide: crash hashes the
+  bare round index, roulette hashes `'roulette:' + index`. One key,
+  many independent streams — the standard trick for deriving several
+  RNGs from one commitment.
+- **The clock that reveals must be the clock that closes.** The round
+  view's phase, reveal and `serverEpochMs` all come from Postgres's
+  `now()` — the same clock that rejects a late bet. Gate the reveal
+  on Lambda's clock instead and the Lambda↔DB skew becomes a window
+  where a player sees the pocket while SQL still accepts bets. Crash
+  got away with the split (an early bust reveal is only avoidance
+  info); roulette cannot (a revealed pocket pays 36×).
+- **Derived geometry beats typed lookup tables.** The 60 splits, 14
+  streets, 23 corners and 11 six-lines all fall out of the 3×12 grid
+  arithmetic; the harness asserts the counts against independent
+  formulas. The one thing that cannot be derived — which numbers are
+  red — is the one lookup constant, and it is labelled as such.
+- **Order-sensitive settlement needs a total order.** The pearl
+  fraction-carry makes settlement sequence-dependent; with many bets
+  per round, "order by round" leaves ties arbitrary and the audit
+  cannot reproduce per-bet awards. `ORDER BY round_index, bet_id` —
+  UUIDv7 ids ARE creation order — makes the sweep deterministic.
+- **Windows bounded by time, not count.** The settle response returns
+  bets settled in the last five MINUTES: a "last N rounds" window
+  with unbounded bets per round is itself unbounded, and misses a
+  straggler older than N rounds — reopening the replay gap the
+  derived-state response exists to close.
+
+### The adversarial checks — this is the deliverable
+
+Highlights: a straight placed ON the coming pocket (planned from the
+secret) pays exactly 36×, one beside it pays 0, an even-money covering
+it pays exactly 2×; three chips stack in one round and settle
+together; the pocket is withheld before :30 and exact after; illegal
+selections and off-window placements return clean rule messages
+(the crash allow-list lesson, proven at birth); the empty-map race
+reports and recovers; every stored pocket, selection and payout
+re-derives.
+
+## Failure modes worth recognising (roulette)
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| "bad selection" on a split that looks adjacent on a wheel photo | Adjacency is LAYOUT adjacency (the 3×12 betting grid), not wheel-order adjacency | Working as designed — the registry derives from the grid; check the selection against `legalSelections` |
+| A chip placed with ~0.2 s left is rejected | The request crossed :30 in flight; SQL's clock closes the window | Working as designed. If it happens with seconds to spare, check the panel is rendering the server clock, not the machine's |
+| An outside bet lost on pocket 0 | Zero is in no dozen, column, colour or parity — that IS the house edge | Working as designed; the disclosure's coverage numbers say 18/37, not 18/36 |
+| The settle response is missing an old result | It settled more than 5 minutes ago — the derived-state window is time-based | The result is in the ledger and bets rows permanently; the response window is for replay safety, not history |
+| A stored pocket fails the HMAC recompute | Direct table write, or the secret rotated without epoch-versioning | Check provenance; rotation legitimately requires an epoch scheme (deferred with the ceremony, `decisions/0029`) |
+| Rollback stranded open roulette bets | The app rolled back with chips on the table | The 0028/0029 posture: the ledger is intact; roll forward or run an admin settle; `voided` is nuclear |
+
 ## Failure modes worth recognising (crash)
 
 | Symptom | Cause | Fix |
@@ -1296,3 +1369,6 @@ Grows as terms first appear. Increment A's entries:
 | **Two-phase bet lifecycle** | Debit now (`open`), settle later (`settled`) — two atomic transactions with the game living in the gap. What `bets.state` and nullable `settled_at` existed for. |
 | **Natural idempotency** | An operation safe to repeat because state transitions (open→settled) can only happen once — no client key needed, but the response must be derived state a retry can reproduce. |
 | **Server-clock adjudication** | Ruling a time-sensitive action by the server's `now()` at arrival, not the client's display — latency is the player's risk. |
+| **Modulo bias** | `x mod n` over a range not divisible by n favours low residues by one grid value each. Invisible at 2^48 scale, but it makes an "exactly 1/n" claim false. |
+| **Rejection sampling** | Draw again (deterministically, here) when the value lands outside the largest even multiple of the target range — the standard fix that makes uniformity exact. |
+| **Domain separation** | Prefixing HMAC messages per use-case (`'roulette:' + i` vs bare `i`) so one key yields independent streams that can never collide. |

@@ -42,6 +42,24 @@ export const CRASH = {
   maxMultiplier: gamesData.crash.max_multiplier,
 } as const;
 
+export const ROULETTE = {
+  periodSeconds: gamesData.roulette.period_seconds,
+  bettingSeconds: gamesData.roulette.betting_seconds,
+  payouts: gamesData.roulette.payouts as Record<string, number>,
+  // DERIVED, not restated: the edge is what the payout identity leaves
+  // on the table — 1 − 36/37 = 1/37 exactly (currency-model.md is the
+  // doc of record). Writing 0.027027… anywhere would be a rounded
+  // restatement of a number that has an exact closed form.
+  edge: 1 - 36 / 37,
+} as const;
+
+/** Coverage per bet type — the identity's other half; validated
+ * against the payout table at load. */
+export const ROULETTE_COVERAGE: Record<string, number> = {
+  straight: 1, split: 2, street: 3, corner: 4, six_line: 6,
+  dozen: 12, column: 12, red: 18, black: 18, odd: 18, even: 18, high: 18, low: 18,
+};
+
 export const GAMES_VERSION = gamesData.content_version;
 
 /** C(n,k) — exact for the row counts in play. */
@@ -113,4 +131,24 @@ function assertGames(condition: boolean, message: string): void {
   );
   assertGames(CRASH.bettingSeconds > 0 && CRASH.bettingSeconds < CRASH.periodSeconds, 'crash: betting window must fit the round');
   assertGames(CRASH.maxMultiplier > CRASH.minCashout, 'crash: cap below the minimum target');
+
+  // Roulette (decisions/0029): the whole table is one identity —
+  // payout × coverage = 36 for every type. A published number that
+  // breaks the identity is a mispriced bet and fails the deploy.
+  assertGames(
+    Object.keys(ROULETTE.payouts).length === Object.keys(ROULETTE_COVERAGE).length,
+    'roulette: payout table and coverage table must name the same types',
+  );
+  for (const [type, coverage] of Object.entries(ROULETTE_COVERAGE)) {
+    const payout = ROULETTE.payouts[type];
+    assertGames(payout !== undefined, `roulette: ${type} missing from the payout table`);
+    assertGames(
+      payout * coverage === 36,
+      `roulette: ${type} breaks the identity — ${payout} × ${coverage} ≠ 36`,
+    );
+  }
+  assertGames(
+    ROULETTE.bettingSeconds > 0 && ROULETTE.bettingSeconds < ROULETTE.periodSeconds,
+    'roulette: betting window must fit the round',
+  );
 })();
