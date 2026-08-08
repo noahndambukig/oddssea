@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth, type Me } from './auth/AuthContext';
 import { call, newIdempotencyKey, ApiError } from './api-client';
 // Content-as-code's third consumer (docs, api, web): the SAME shipping
@@ -35,6 +35,79 @@ export function GamePanel() {
   const [plinkoRisk, setPlinkoRisk] = useState<'low' | 'mid' | 'high'>('low');
   const [plinkoStake, setPlinkoStake] = useState(10);
   const [lastDrop, setLastDrop] = useState<PlinkoResult | null>(null);
+
+  const [crashStake, setCrashStake] = useState(10);
+  const [crashTarget, setCrashTarget] = useState('');
+  const [crashView, setCrashView] = useState<CrashRoundView | null>(null);
+  const [lastCrash, setLastCrash] = useState<CrashOutcome | null>(null);
+  const [, setCrashTick] = useState(0);
+  // The server's clock is the round's clock: the offset learned from
+  // every poll corrects this browser's, so the window countdown and the
+  // curve animation line up with what SQL will actually rule.
+  const crashOffset = useRef(0);
+  const crashBusy = useRef(false);
+  const crashSettling = useRef(false);
+  const meRef = useRef(me);
+  meRef.current = me;
+
+  /**
+   * The flight poll (decisions/0028): the client animates the public
+   * curve locally between polls, but the BUST is server-revealed — it
+   * never crosses the wire before its moment has passed, so the only
+   * way to see the round die is to keep asking. The same response
+   * carries other players' cashouts (the feed) and whether any of my
+   * bets await settlement; settlement itself is an explicit POST, never
+   * a side effect of the read.
+   */
+  useEffect(() => {
+    if (!config) return;
+    let alive = true;
+    let beat = 0;
+
+    const poll = async () => {
+      if (!meRef.current || crashBusy.current) return;
+      crashBusy.current = true;
+      try {
+        const view = await call<CrashRoundView>(config, '/crash/round');
+        if (!alive) return;
+        crashOffset.current = view.serverEpochMs - Date.now();
+        setCrashView(view);
+
+        if (view.pendingSettlement && !crashSettling.current) {
+          crashSettling.current = true;
+          try {
+            const settled = await call<CrashSettleResult>(config, '/bets/crash/settle', {
+              method: 'POST',
+            });
+            if (alive && meRef.current) {
+              applyMe({ ...meRef.current, shells: settled.shells, pearls: settled.pearls });
+              if (settled.recent.length > 0) setLastCrash(settled.recent[0]);
+              window.dispatchEvent(new CustomEvent('oddssea:tasks-changed'));
+            }
+          } finally {
+            crashSettling.current = false;
+          }
+        }
+      } catch {
+        // Background poll: errors surface on the next player action.
+      } finally {
+        crashBusy.current = false;
+      }
+    };
+
+    const interval = setInterval(() => {
+      if (!alive) return;
+      setCrashTick((t) => t + 1);
+      beat += 1;
+      if (beat % 4 === 0) void poll();
+    }, 250);
+    void poll();
+
+    return () => {
+      alive = false;
+      clearInterval(interval);
+    };
+  }, [config, applyMe]);
 
   if (!config || !me) return null;
 
@@ -128,6 +201,40 @@ export function GamePanel() {
     if (result) {
       applyMe({ ...me!, shells: result.shells, pearls: result.pearls });
       setLastDrop(result);
+      window.dispatchEvent(new CustomEvent('oddssea:tasks-changed'));
+    }
+  }
+
+  async function rideCrash() {
+    const key = newIdempotencyKey();
+    const target = crashTarget.trim() === '' ? undefined : Number(crashTarget);
+    const result = await run('crash-bet', () =>
+      call<CrashPlaceResult>(config!, '/bets/crash', {
+        method: 'POST',
+        idempotencyKey: key,
+        body: { stake: crashStake, ...(target !== undefined ? { autoTarget: target } : {}) },
+        onWaking: () => setWaking(true),
+      }),
+    );
+    if (result) {
+      applyMe({ ...me!, shells: result.shells, pearls: result.pearls });
+      window.dispatchEvent(new CustomEvent('oddssea:tasks-changed'));
+    }
+  }
+
+  async function cashOutCrash(betId: string) {
+    const key = newIdempotencyKey();
+    const result = await run('crash-cashout', () =>
+      call<CrashOutcome & { shells: number; pearls: number }>(config!, '/bets/crash/cashout', {
+        method: 'POST',
+        idempotencyKey: key,
+        body: { betId },
+        onWaking: () => setWaking(true),
+      }),
+    );
+    if (result) {
+      applyMe({ ...me!, shells: result.shells, pearls: result.pearls });
+      setLastCrash(result);
       window.dispatchEvent(new CustomEvent('oddssea:tasks-changed'));
     }
   }
@@ -289,6 +396,165 @@ export function GamePanel() {
         </details>
       </section>
 
+      {(() => {
+        // Everything below derives from the server-corrected clock; the
+        // poll overlays the facts only the server may reveal (the bust,
+        // the feed, my open bet).
+        const crash = gamesData.crash;
+        const cNow = Date.now() + crashOffset.current;
+        const cIdx = Math.floor(cNow / 1000 / crash.period_seconds);
+        const cElapsed = (cNow / 1000) % crash.period_seconds;
+        const viewIsCurrent = crashView !== null && crashView.round.index === cIdx;
+        const busted = viewIsCurrent && crashView!.round.bust !== undefined;
+        const cPhase: 'betting' | 'flight' | 'over' =
+          cElapsed < crash.betting_seconds ? 'betting' : busted ? 'over' : 'flight';
+        const cMult =
+          cElapsed <= crash.betting_seconds
+            ? 1
+            : Math.min(
+                crash.max_multiplier,
+                Math.floor(2 ** ((cElapsed - crash.betting_seconds) / crash.double_every_seconds) * 100) / 100,
+              );
+        const myBet = viewIsCurrent ? crashView!.myOpenBet : null;
+
+        return (
+          <section className="panel">
+            <h2>Crash</h2>
+            <p className="muted">
+              One shared round per minute: bet in the first {crash.betting_seconds} seconds,
+              then the curve climbs from 1.00× until it busts. Cash out before the bust —
+              live, or with an auto-cashout target — to lock stake × multiplier. Everyone
+              rides the same curve.
+            </p>
+
+            {cPhase === 'betting' && (
+              <>
+                <p>
+                  Round <code>{cIdx}</code> — betting closes in{' '}
+                  <code>{Math.max(0, crash.betting_seconds - cElapsed).toFixed(0)}s</code>
+                </p>
+                {myBet ? (
+                  <p className="muted">
+                    Riding this round: <code>{myBet.stake}</code> Shells
+                    {myBet.autoTarget !== null && <> · auto-cashout ×<code>{myBet.autoTarget}</code></>}
+                  </p>
+                ) : (
+                  <div className="actions">
+                    <label className="attest">
+                      <span>Stake</span>
+                      <input
+                        type="number"
+                        min={gamesData.instant.min_stake_shells}
+                        step={10}
+                        value={crashStake}
+                        onChange={(e) => setCrashStake(Number(e.target.value))}
+                      />
+                    </label>
+                    <label className="attest">
+                      <span>Auto-cashout × (optional)</span>
+                      <input
+                        type="number"
+                        min={crash.min_cashout}
+                        max={crash.max_multiplier}
+                        step={0.01}
+                        placeholder="none"
+                        value={crashTarget}
+                        onChange={(e) => setCrashTarget(e.target.value)}
+                      />
+                    </label>
+                    <button onClick={rideCrash} disabled={busy !== null}>
+                      {busy === 'crash-bet' ? 'Placing…' : 'Bet'}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {cPhase === 'flight' && (
+              <>
+                <p>
+                  <strong>×{cMult.toFixed(2)}</strong> and climbing…
+                </p>
+                {myBet && (
+                  <div className="actions">
+                    <button onClick={() => cashOutCrash(myBet.betId)} disabled={busy !== null}>
+                      {busy === 'crash-cashout'
+                        ? 'Cashing out…'
+                        : `Cash out @ ×${cMult.toFixed(2)}`}
+                    </button>
+                  </div>
+                )}
+                {viewIsCurrent && crashView!.round.cashouts.length > 0 && (
+                  <p className="muted">
+                    Bailed this round:{' '}
+                    {crashView!.round.cashouts.map((m, i) => (
+                      <span key={i}>
+                        <code>×{m}</code>{' '}
+                      </span>
+                    ))}
+                  </p>
+                )}
+              </>
+            )}
+
+            {cPhase === 'over' && (
+              <p>
+                Busted at <strong>×{crashView!.round.bust}</strong> — next round in{' '}
+                <code>{Math.max(0, crash.period_seconds - cElapsed).toFixed(0)}s</code>
+              </p>
+            )}
+
+            {lastCrash && (
+              <div className="result">
+                <p className="muted">
+                  Last ride: {lastCrash.won ? 'cashed out at' : 'lost —'}{' '}
+                  {lastCrash.won && <code>×{lastCrash.multiplier}</code>}
+                  {!lastCrash.won && <>bust <code>×{lastCrash.bust}</code></>}. Payout{' '}
+                  <code>{lastCrash.payout}</code> Shells, <code>{lastCrash.pearlsAwarded}</code>{' '}
+                  Pearls.
+                </p>
+              </div>
+            )}
+
+            {crashView && (
+              <p className="muted">
+                Last round busted at <code>×{crashView.lastRound.bust}</code>
+                {crashView.lastRound.cashouts.length > 0 && (
+                  <>
+                    {' '}— cashouts:{' '}
+                    {crashView.lastRound.cashouts.map((m, i) => (
+                      <span key={i}>
+                        <code>×{m}</code>{' '}
+                      </span>
+                    ))}
+                  </>
+                )}
+              </p>
+            )}
+
+            <details>
+              <summary>
+                Published odds — RTP {((1 - gamesData.instant.edge) * 100).toFixed(2)}% at
+                every cash-out target (house edge{' '}
+                {(gamesData.instant.edge * 100).toFixed(0)}%)
+              </summary>
+              <p className="muted">
+                The bust law: P(bust ≥ m) = {(1 - gamesData.instant.edge).toFixed(2)}/m for
+                every cent target from ×{crash.min_cashout} to ×
+                {crash.max_multiplier.toLocaleString()}, so every target returns exactly{' '}
+                {((1 - gamesData.instant.edge) * 100).toFixed(2)}% of stake in expectation —
+                ties pay. Payouts floor to whole Shells, so the effective Shell return sits
+                at or below that figure and converges to it at larger stakes. Each round's
+                bust is derived before the round runs: U from the first 48 bits of
+                HMAC-SHA256(server secret, round number), bust = clamp(1.00,
+                floor₂({(1 - gamesData.instant.edge).toFixed(2)}/U), {crash.max_multiplier.toLocaleString()}) — every
+                past bust is recomputable from the recipe.
+              </p>
+            </details>
+          </section>
+        );
+      })()}
+
       {waking && (
         <p className="muted">
           Waking the database — it pauses when nobody is playing, which is why
@@ -327,6 +593,51 @@ interface PlinkoResult {
   payout: number;
   pearlsAwarded: number;
   pearlsPending: number;
+  shells: number;
+  pearls: number;
+}
+
+interface CrashRoundView {
+  serverEpochMs: number;
+  round: {
+    index: number;
+    phase: 'betting' | 'flight' | 'over';
+    bust?: number;
+    secondsLeftInWindow: number;
+    secondsToNextRound: number;
+    cashouts: number[];
+  };
+  myOpenBet: { betId: string; stake: number; autoTarget: number | null } | null;
+  pendingSettlement: boolean;
+  lastRound: { index: number; bust: number; cashouts: number[] };
+}
+
+interface CrashOutcome {
+  betId: string;
+  roundIndex?: number;
+  autoTarget?: number | null;
+  bust: number;
+  multiplier: number | null;
+  won: boolean;
+  stake: number;
+  payout: number;
+  pearlsAwarded: number;
+}
+
+interface CrashSettleResult {
+  recent: CrashOutcome[];
+  skipped: number[];
+  shells: number;
+  pearls: number;
+  pearlsPending: number;
+}
+
+interface CrashPlaceResult {
+  betId: string;
+  roundIndex: number;
+  autoTarget: number | null;
+  stake: number;
+  skipped: number[];
   shells: number;
   pearls: number;
 }

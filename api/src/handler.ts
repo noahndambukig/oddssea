@@ -54,7 +54,8 @@ import {
   utcWeekStart,
   type PoolEntry,
 } from './tasks';
-import { INSTANT, PLINKO_PROFILES, PLINKO_RISKS, GAMES_VERSION, type PlinkoRisk } from './games';
+import { CRASH, INSTANT, PLINKO_PROFILES, PLINKO_RISKS, GAMES_VERSION, type PlinkoRisk } from './games';
+import { crashBust, roundElapsed, roundIndex, tBustSeconds } from './crash';
 
 /** The content version stamped on every logged roll (data-model.md rule 5). */
 const CONTENT_VERSION = process.env.CONTENT_VERSION ?? '1.1.0';
@@ -116,6 +117,96 @@ function idempotencyKey(event: APIGatewayProxyEventV2WithJWTAuthorizer): string 
   const headers = event.headers ?? {};
   const key = headers['idempotency-key'] ?? headers['Idempotency-Key'];
   return key ?? null;
+}
+
+// ------------------------------------------------------------------- crash
+//
+// The round secret is fetched by ARN and cached for the container's
+// lifetime — the BFF client-secret pattern (env values are visible to
+// anyone with infra read access; Secrets Manager values are not).
+let cachedCrashSecret: string | null = null;
+
+async function crashSecret(): Promise<string> {
+  if (cachedCrashSecret) return cachedCrashSecret;
+  const { SecretsManagerClient, GetSecretValueCommand } = await import(
+    '@aws-sdk/client-secrets-manager'
+  );
+  const client = new SecretsManagerClient({});
+  const result = await client.send(
+    new GetSecretValueCommand({ SecretId: process.env.CRASH_SECRET_ARN! }),
+  );
+  cachedCrashSecret = result.SecretString!;
+  return cachedCrashSecret;
+}
+
+/** Timing/pricing parameters every crash SQL call carries — from the
+ * shipping copy, never hardcoded here or in SQL. */
+const CRASH_CALL_PARAMS = {
+  p_edge: INSTANT.edge,
+  p_betting_s: CRASH.bettingSeconds,
+  p_double_s: CRASH.doubleEverySeconds,
+  p_period_s: CRASH.periodSeconds,
+};
+const CRASH_CALL_CASTS = {
+  p_player_id: 'uuid',
+  p_busts: 'jsonb',
+  p_edge: 'numeric',
+  p_betting_s: 'integer',
+  p_double_s: 'integer',
+  p_period_s: 'integer',
+} as const;
+
+/**
+ * The busts map for my open DECIDED rounds — the settlement input. A
+ * round is decided when its minute ended, or when its bust moment
+ * passed; the bust of an undecided round never crosses the wire (the
+ * reveal is time-gated, not trust-gated). SQL re-derives decidedness
+ * against its own clock, so a map entry that arrives early is simply
+ * not applied.
+ */
+async function decidedBusts(playerId: string, secret: string): Promise<Record<string, number>> {
+  const rows = await query<{ round_index: string }>(
+    `SELECT DISTINCT bc.round_index
+       FROM bets b JOIN bet_crash bc ON bc.bet_id = b.id
+      WHERE b.player_id = :id::uuid AND b.state = 'open'`,
+    { id: playerId },
+  );
+
+  const nowMs = Date.now();
+  const current = roundIndex(nowMs);
+  const elapsed = roundElapsed(nowMs);
+
+  const busts: Record<string, number> = {};
+  for (const row of rows) {
+    const idx = Number(row.round_index);
+    const bust = crashBust(secret, idx);
+    const decided = idx < current || (idx === current && elapsed >= tBustSeconds(bust));
+    if (decided) busts[String(idx)] = bust;
+  }
+  return busts;
+}
+
+/** One keyless settle call: naturally idempotent, derived-state response. */
+async function settleCrash(playerId: string, secret: string): Promise<Record<string, unknown>> {
+  const busts = await decidedBusts(playerId, secret);
+  const result = (await callFunction('settle_crash_bets', {
+    p_player_id: playerId,
+    p_busts: JSON.stringify(busts),
+    ...CRASH_CALL_PARAMS,
+  }, { casts: CRASH_CALL_CASTS })) as Record<string, unknown>;
+
+  // A minute rolled between the pre-read and the call: one retry with a
+  // refreshed map. The follow-up is ALWAYS this keyless call — a keyed
+  // retry would short-circuit at its stored response.
+  if (Array.isArray(result.skipped) && result.skipped.length > 0) {
+    const refreshed = await decidedBusts(playerId, secret);
+    return (await callFunction('settle_crash_bets', {
+      p_player_id: playerId,
+      p_busts: JSON.stringify(refreshed),
+      ...CRASH_CALL_PARAMS,
+    }, { casts: CRASH_CALL_CASTS })) as Record<string, unknown>;
+  }
+  return result;
 }
 
 /**
@@ -427,6 +518,183 @@ export async function handler(
         return toResult(json(200, result));
       }
 
+      case 'POST /bets/crash': {
+        const key = idempotencyKey(event);
+        if (!key) return toResult(json(400, { error: 'idempotency_key_required' }));
+
+        const body = JSON.parse(event.body ?? '{}') as { stake?: number; autoTarget?: number };
+        if (!body.stake) {
+          return toResult(json(400, { error: 'stake_required' }));
+        }
+
+        const player = await currentPlayer(event);
+        const secret = await crashSecret();
+        const busts = await decidedBusts(player.id, secret);
+
+        const result = (await callFunction('place_crash_bet', {
+          p_player_id: player.id,
+          p_idempotency_key: key,
+          p_stake: Math.floor(body.stake),
+          p_auto_target: body.autoTarget ?? null,
+          p_busts: JSON.stringify(busts),
+          p_min_stake: INSTANT.minStakeShells,
+          p_min_target: CRASH.minCashout,
+          p_cap: CRASH.maxMultiplier,
+          p_content_version: GAMES_VERSION,
+          ...CRASH_CALL_PARAMS,
+        }, {
+          casts: {
+            ...CRASH_CALL_CASTS,
+            p_auto_target: 'numeric',
+            p_min_target: 'numeric',
+            p_cap: 'numeric',
+          },
+        })) as Record<string, unknown>;
+
+        // Stragglers the pre-read missed settle via the KEYLESS call —
+        // re-invoking place with the same key would answer from its
+        // stored response and never see a fresh map.
+        if (Array.isArray(result.skipped) && result.skipped.length > 0) {
+          const settled = await settleCrash(player.id, secret);
+          return toResult(json(200, {
+            ...result,
+            skipped: settled.skipped,
+            shells: settled.shells,
+            pearls: settled.pearls,
+          }));
+        }
+        return toResult(json(200, result));
+      }
+
+      case 'POST /bets/crash/cashout': {
+        const key = idempotencyKey(event);
+        if (!key) return toResult(json(400, { error: 'idempotency_key_required' }));
+
+        const body = JSON.parse(event.body ?? '{}') as { betId?: string };
+        if (!body.betId) return toResult(json(400, { error: 'bet_id_required' }));
+
+        const player = await currentPlayer(event);
+
+        // The bust is computed for THE BET'S round, read here — not for
+        // "the current minute by this Lambda's clock", which could differ
+        // from SQL's at a boundary. SQL then verifies that round IS its
+        // current one; a mismatched bust can never be applied.
+        const betRows = await query<{ round_index: string }>(
+          `SELECT bc.round_index
+             FROM bets b JOIN bet_crash bc ON bc.bet_id = b.id
+            WHERE b.id = :bet::uuid AND b.player_id = :id::uuid AND b.state = 'open'`,
+          { bet: body.betId, id: player.id },
+        );
+        if (!betRows.length) return toResult(json(404, { error: 'bet_not_open' }));
+
+        const secret = await crashSecret();
+        const bust = crashBust(secret, Number(betRows[0].round_index));
+
+        const result = await callFunction('cashout_crash_bet', {
+          p_player_id: player.id,
+          p_idempotency_key: key,
+          p_bet_id: body.betId,
+          p_bust: bust,
+          p_min_target: CRASH.minCashout,
+          p_cap: CRASH.maxMultiplier,
+          ...CRASH_CALL_PARAMS,
+        }, {
+          casts: {
+            p_player_id: 'uuid',
+            p_bet_id: 'uuid',
+            p_bust: 'numeric',
+            p_min_target: 'numeric',
+            p_cap: 'numeric',
+            p_edge: 'numeric',
+            p_betting_s: 'integer',
+            p_double_s: 'integer',
+            p_period_s: 'integer',
+          },
+        });
+        return toResult(json(200, result));
+      }
+
+      case 'POST /bets/crash/settle': {
+        // Keyless on purpose: every outcome was decided before the call,
+        // and the response is derived state a retry reproduces.
+        const player = await currentPlayer(event);
+        const secret = await crashSecret();
+        const result = await settleCrash(player.id, secret);
+        return toResult(json(200, result));
+      }
+
+      case 'GET /crash/round': {
+        const player = await currentPlayer(event);
+        const secret = await crashSecret();
+
+        const nowMs = Date.now();
+        const idx = roundIndex(nowMs);
+        const elapsed = roundElapsed(nowMs);
+
+        const bust = crashBust(secret, idx);
+        const tBust = tBustSeconds(bust);
+        const over = elapsed >= tBust;
+        const phase = elapsed < CRASH.bettingSeconds ? 'betting' : over ? 'over' : 'flight';
+
+        const [mine, feed] = await Promise.all([
+          query<{ id: string; stake: number; auto_target: string | null; round_index: string; state: string }>(
+            `SELECT b.id, b.stake, bc.auto_target, bc.round_index, b.state
+               FROM bets b JOIN bet_crash bc ON bc.bet_id = b.id
+              WHERE b.player_id = :id::uuid AND b.state = 'open'`,
+            { id: player.id },
+          ),
+          query<{ round_index: string; multiplier: string }>(
+            `SELECT bc.round_index, b.decimal_odds AS multiplier
+               FROM bets b JOIN bet_crash bc ON bc.bet_id = b.id
+              WHERE bc.round_index IN (:cur, :prev)
+                AND b.state = 'settled' AND b.decimal_odds IS NOT NULL
+              ORDER BY b.settled_at`,
+            { cur: idx, prev: idx - 1 },
+          ),
+        ]);
+
+        const myOpenBet = mine.find((b) => Number(b.round_index) === idx) ?? null;
+        const pendingSettlement = mine.some((b) => {
+          const bIdx = Number(b.round_index);
+          return bIdx < idx || (bIdx === idx && elapsed >= tBustSeconds(crashBust(secret, bIdx)));
+        });
+
+        return toResult(
+          json(200, {
+            serverEpochMs: nowMs,
+            round: {
+              index: idx,
+              phase,
+              // The bust is REVEALED only once its moment has passed —
+              // before that it never crosses the wire. Same for timing:
+              // flight exposes no countdown that would leak t_bust.
+              ...(over ? { bust } : {}),
+              secondsLeftInWindow:
+                phase === 'betting' ? Number((CRASH.bettingSeconds - elapsed).toFixed(3)) : 0,
+              secondsToNextRound: Number((CRASH.periodSeconds - elapsed).toFixed(3)),
+              cashouts: feed
+                .filter((f) => Number(f.round_index) === idx)
+                .map((f) => Number(f.multiplier)),
+            },
+            myOpenBet: myOpenBet
+              ? {
+                  betId: myOpenBet.id,
+                  stake: Number(myOpenBet.stake),
+                  autoTarget: myOpenBet.auto_target === null ? null : Number(myOpenBet.auto_target),
+                }
+              : null,
+            pendingSettlement,
+            lastRound: {
+              index: idx - 1,
+              bust: crashBust(secret, idx - 1),
+              cashouts: feed
+                .filter((f) => Number(f.round_index) === idx - 1)
+                .map((f) => Number(f.multiplier)),
+            },
+          }),
+        );
+      }
+
       // ----------------------------------------------------------- tasks
       case 'GET /tasks': {
         const player = await currentPlayer(event);
@@ -443,6 +711,7 @@ export async function handler(
             bets_ever: number;
             bets_dice: number;
             bets_plinko: number;
+            bets_crash: number;
           }>(
             `SELECT
                COUNT(*) FILTER (WHERE (created_at AT TIME ZONE 'UTC')::date = :today::date) AS bets_today,
@@ -452,7 +721,8 @@ export async function handler(
                                   AND (created_at AT TIME ZONE 'UTC')::date < :week::date + 7) AS bets_week,
                COUNT(*) AS bets_ever,
                COUNT(*) FILTER (WHERE game = 'dice') AS bets_dice,
-               COUNT(*) FILTER (WHERE game = 'plinko') AS bets_plinko
+               COUNT(*) FILTER (WHERE game = 'plinko') AS bets_plinko,
+               COUNT(*) FILTER (WHERE game = 'crash') AS bets_crash
                FROM bets WHERE player_id = :id::uuid`,
             { id: player.id, today, week: weekStart },
           ),
@@ -469,7 +739,7 @@ export async function handler(
 
         const agg = betAgg[0] ?? {
           bets_today: 0, wins_today: 0, games_today: 0, bets_week: 0,
-          bets_ever: 0, bets_dice: 0, bets_plinko: 0,
+          bets_ever: 0, bets_dice: 0, bets_plinko: 0, bets_crash: 0,
         };
         const claimedToday = new Set(
           weekClaims.filter((c) => c.claim_date === today).map((c) => c.task_key),
@@ -585,6 +855,13 @@ export async function handler(
                 claimed: owned.has('first_bet:plinko'),
                 claimable: !owned.has('first_bet:plinko') && Number(agg.bets_plinko) > 0,
               },
+              {
+                key: 'first_bet:crash',
+                name: 'First crash ride',
+                amount: AMOUNTS.firstBetGame,
+                claimed: owned.has('first_bet:crash'),
+                claimable: !owned.has('first_bet:crash') && Number(agg.bets_crash) > 0,
+              },
               ...FEATURE_FIRSTS.map((f) => ({
                 key: f.key,
                 name: f.name,
@@ -610,6 +887,7 @@ export async function handler(
           ...TOUR_STEPS.map((s) => s.key),
           'first_bet:dice',
           'first_bet:plinko',
+          'first_bet:crash',
           ...FEATURE_FIRSTS.map((f) => f.key),
         ]);
         if (!body.taskKey || !valid.has(body.taskKey)) {

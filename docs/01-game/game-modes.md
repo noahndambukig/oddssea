@@ -47,7 +47,11 @@ stake × current multiplier. Everyone rides the same curve and cashouts
 are visible in the feed — seeing others bail is the game. Auto-cashout
 at a player-set multiplier is supported. The bust distribution is derived
 directly from the game's edge, up to the multiplier cap in the currency
-model.
+model. Timing (game feel, `decisions/0028`): each round is one UTC
+minute — betting in the first 10 seconds, then the curve flies, doubling
+every 4 seconds, reaching the cap just inside the minute; rounds are
+derived from the clock, so no scheduler exists and every bust is
+recomputable (implemented by `data/games.json`).
 
 ## Roulette — the shared table
 

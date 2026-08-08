@@ -1071,6 +1071,84 @@ shows distinct-games 1/2 after two same-game bets; the panel renders
 multipliers, probabilities and exact RTP from the same shipping copy the
 server prices against.
 
+## Part 13 — crash: the first shared round
+
+### What changes
+
+Dice and plinko bets live and die inside one HTTP request. Crash is the
+first thing that exists BETWEEN requests: a round every player shares,
+climbing and busting on a schedule — built with no scheduler, no round
+rows, and nothing running while nobody plays. The 002 schema's dormant
+columns (`state`, `settled_at`, the "nullable on purpose" `decimal_odds`)
+finally do the job they were designed for.
+
+### Concepts before commands
+
+- **Rounds as arithmetic (derive, don't store).** A round IS its UTC
+  minute: index = `floor(epoch/60)`, betting in seconds 0–10, the curve
+  doubling every 4 s after. Any request can compute any fact about any
+  round on demand — the same philosophy as task progress and ledger
+  balances. What would be a scheduler in a real casino is a pure
+  function of the clock here.
+- **HMAC as deterministic RNG — and as commitment.** The bust is
+  `HMAC-SHA256(secret, round index)` mapped through the edge law:
+  unpredictable without the secret, reproducible forever with it. That
+  second property is the audit — every stored bust is re-derived and
+  compared, and the secret is RETAINed precisely because deleting it
+  would orphan the evidence.
+- **The inverse-CDF law, and why every target pays the same.** Draw U
+  uniform, set `bust = floor2(0.97/U)`: then `P(bust ≥ m) = 0.97/m`,
+  so cashing out at ANY cent target returns exactly 97.00% of stake in
+  expectation. No table to tune (plinko needed one per risk); two
+  constants and a formula. Flooring to cents costs nothing at cent
+  targets — grid alignment is what keeps the law exact — and ties pay
+  in both verbs because the law says `≥`. On top sits one honest
+  wrinkle, published rather than engineered away: Shell payouts floor
+  to whole Shells, so effective Shell RTP converges to 97.00% from
+  below as stakes grow.
+- **The two-phase lifecycle.** Placement debits the stake and leaves
+  the bet `open`; settlement is a second transaction that locks the
+  multiplier, pays, and stamps `settled_at`. Each transition is atomic;
+  the gap between them is the game. Settlement eligibility is
+  decided-not-elapsed: from the moment the curve passes the bust,
+  nothing can change any outcome, so the round settles mid-minute.
+- **Server-clock adjudication.** A live cashout pays the curve's value
+  when the request ARRIVES — latency is the player's risk, exactly as
+  in real crash. The client's animation is a courtesy; SQL's `now()`
+  is the ruling.
+- **Natural idempotency needs a replayable response.** The maturity
+  settle carries no idempotency key — every outcome it writes was
+  decided before the call, and open→settled under the row lock makes
+  double-pay impossible. What the keyless call must NOT do is answer a
+  retry with an empty receipt, so its response is derived state (my
+  recent settled bets + balances) that any retry reproduces.
+- **Time-gated reveal.** The current round's bust never crosses the
+  wire before its moment passes; afterwards it is public history and
+  the ~1 s flight poll carries it, along with other players' cashouts —
+  the spec's feed, barebones, no websockets.
+
+### The adversarial checks — this is the deliverable
+
+Highlights: a press after the bust moment loses by arithmetic; the
+bust cent itself pays (ties); an auto-target equal to the bust wins; a
+sub-minimum press is rejected with the bet left open while a 1.00×
+bust loses outright; settlement lands mid-minute at the bust moment;
+a deliberately empty busts map settles nothing and reports the skipped
+round; every stored bust equals its HMAC recompute; player B's cashout
+appears in player A's next flight poll.
+
+## Failure modes worth recognising (crash)
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| The UI's multiplier climbs ~a second past where the round died, then snaps to "busted" | The bust is server-revealed by the flight poll; between polls the client animates blind — the reveal is time-gated on purpose | Nothing at barebones. WebSockets shrink the window later; the server's ruling was already made at `t_bust` |
+| "betting window closed" on a bet pressed with ~0.1 s left | The request crossed the boundary in flight — SQL's `now()` is the authority, and the corrected clock only minimises the window, never removes it | Working as designed. If it happens with seconds to spare, the clock offset is broken — check `serverEpochMs` handling |
+| A bet stayed open long after its round ended | The player closed the tab; nothing settles until they touch the API again (settle POST, or the defensive settle inside the next bet) | Working as designed — lazy settlement. The money is decided, just unwritten; it lands on their next visit |
+| "already riding this round" | One open bet per player per round, checked under the row lock | Working as designed; the UI shows the open bet instead of the form |
+| "too early to cash out" in the first ~60 ms of flight | The live path enforces the 1.01× minimum — a 1.00× cashout would be stake back plus base Pearls, a zero-risk Pearl farm | Working as designed (review round 2 caught the bypass) |
+| A stored bust fails the HMAC recompute | Someone wrote `bet_crash` directly, or the secret was rotated without an epoch scheme | Check provenance (the app role cannot write tables). Rotation legitimately requires epoch-versioning — deferred with the ceremony, `decisions/0028` |
+| A rider is paid 1,000× by a live press well after the cap moment | `m_now` clamps at the cap, the bust equals the cap, and ties pay — the capped round resolves as a win at the cap | Working as designed: the cap is the curve's ceiling, not a bust |
+
 ## Failure modes worth recognising (plinko)
 
 | Symptom | Cause | Fix |
@@ -1211,3 +1289,10 @@ Grows as terms first appear. Increment A's entries:
 | **Pity counter** | Persistent per-player state guaranteeing a rare outcome within N attempts. State, not chance — which is why it lives under the same row lock as the money. |
 | **Fisher-Yates** | The unbiased shuffle: walk the array once, swapping each position with a uniformly chosen earlier-or-equal one. `sort(() => random)` is biased; this is not. |
 | **Content-as-code** | Shipping game content as versioned data files consumed by docs, simulation and runtime alike — one source of truth, three readers, and a version stamp on every roll. |
+| **Time-indexed rounds** | Shared game rounds derived from the clock (round = the UTC minute) instead of created by a scheduler — no round rows, no process, any request computes any round. |
+| **Lazy settlement** | Writing a decided outcome only when someone asks — the player's settle call, or the next bet's defensive sweep — instead of eagerly on a timer. Correct because decided ≠ written. |
+| **HMAC** | A keyed hash: unpredictable without the key, reproducible forever with it. Used here as both the round RNG and the audit commitment. |
+| **Inverse-CDF sampling** | Turning one uniform draw into any target distribution by inverting its cumulative curve — `bust = 0.97/U` is the whole crash generator. |
+| **Two-phase bet lifecycle** | Debit now (`open`), settle later (`settled`) — two atomic transactions with the game living in the gap. What `bets.state` and nullable `settled_at` existed for. |
+| **Natural idempotency** | An operation safe to repeat because state transitions (open→settled) can only happen once — no client key needed, but the response must be derived state a retry can reproduce. |
+| **Server-clock adjudication** | Ruling a time-sensitive action by the server's `now()` at arrival, not the client's display — latency is the player's risk. |
